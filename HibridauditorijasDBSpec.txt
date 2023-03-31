@@ -1,0 +1,36 @@
+
+ConferenceSession
+	- id			-> PlugNmeet sid
+	- started		-> Current time ms
+	- ended			-> DEFAULT -1
+	- is_active 	-> PlugNmeet /room/isRoomActive
+LivestreamSession
+	- id			-> 
+	- epiphan_id 	-> Epiphan device
+	- sid			-> Conference Sessionid
+	- started		-> Current time ms
+	- ended			-> DEFAULT -1
+EpiphanConfig
+	- id
+	- host
+	- key 			-> Epiphan api key? or username password
+	- name			-> Name of classroom/epiphan device
+RecordingSession
+	- id
+	- recorderId 	-> PNM RecorderId
+	- sid			-> Conference Sessionid
+	- started		-> Current time ms
+	- ended			-> DEFAULT -1
+LivekitRecording
+	- id
+	- recording_sid
+	- egress_id		-> Livekit Egress service session id
+	- filename		-> Default null
+	- started		-> Current time ms
+	- ended			-> DEFAULT -1
+EpiphanRecording
+	- id
+	- recording_sid
+	- epiphan_id
+	- started		-> Current time ms
+	- ended			-> DEFAULT -1

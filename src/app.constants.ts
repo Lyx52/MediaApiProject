@@ -1,0 +1,1 @@
+export const EPIPHAN_SERVICE = 'EPIPHAN_SERVICE';
