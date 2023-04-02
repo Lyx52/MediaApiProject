@@ -4,9 +4,6 @@ import { PhotoModule } from './photo/photo.module';
 import { Photo } from './photo/photo.entity';
 import { Epiphan } from "./epiphan/epiphan.entity";
 import { EpiphanModule } from "./epiphan/epiphan.module";
-import { ClientsModule, Transport } from "@nestjs/microservices";
-import { EPIPHAN_SERVICE } from "./app.constants";
-
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -19,5 +16,8 @@ import { EPIPHAN_SERVICE } from "./app.constants";
     }),
     PhotoModule, EpiphanModule
   ],
+  providers: [
+
+  ]
 })
 export class AppModule {}

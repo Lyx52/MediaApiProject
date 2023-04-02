@@ -13,7 +13,9 @@ import { HttpModule } from "@nestjs/axios";
       maxRedirects: 5,
     }),
   ],
-  providers: [EpiphanService],
+  providers: [
+    EpiphanService,
+  ],
   controllers: [EpiphanController]
 })
 export class EpiphanModule {}
