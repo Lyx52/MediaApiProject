@@ -4,6 +4,7 @@ import { PhotoModule } from './photo/photo.module';
 import { Photo } from './photo/photo.entity';
 import { Epiphan } from "./epiphan/epiphan.entity";
 import { EpiphanModule } from "./epiphan/epiphan.module";
+import { PlugNMeetModule } from "./plugnmeet/plugnmeet.module";
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -14,7 +15,7 @@ import { EpiphanModule } from "./epiphan/epiphan.module";
       synchronize: true,
       useUnifiedTopology: true,
     }),
-    PhotoModule, EpiphanModule
+    PhotoModule, EpiphanModule, PlugNMeetModule
   ],
   providers: [
 

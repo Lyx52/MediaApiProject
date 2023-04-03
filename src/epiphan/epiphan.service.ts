@@ -1,7 +1,8 @@
 import { Injectable, Logger, NotFoundException, UseInterceptors } from "@nestjs/common";
 import { handleRetry, InjectRepository } from "@nestjs/typeorm";
 import { AxiosResponse, AxiosError } from 'axios';
-import { MongoRepository } from 'typeorm';
+import { FindOptionsSelect, MongoRepository } from "typeorm";
+import { ObjectID } from "mongodb";
 import { Epiphan } from "./epiphan.entity";
 import { CreateEpiphanDto } from "./dto/CreateEpiphanDto";
 import { HttpService } from "@nestjs/axios";
@@ -17,6 +18,7 @@ import {
   firstValueFrom,
   retry, filter, of, mergeWith, pipe
 } from "rxjs";
+
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
@@ -26,14 +28,6 @@ export class EpiphanService {
     private readonly httpService: HttpService
   ) {}
 
-  private handleBaseResponse(response: AxiosResponse): BaseResponse {
-    const validStatus = [200, 201, 204].includes(response.status);
-    return {
-      success: validStatus,
-      data: response.data,
-    }
-  }
-
   private makeAuthHeader(config: Epiphan): object {
     return {
       Authorization: `Basic ${Buffer.from(
@@ -42,12 +36,18 @@ export class EpiphanService {
     };
   }
   async findAll(): Promise<Epiphan[]> {
-    return this.epiphanRepository.find();
+    return this.findAllSelectFields(['id', 'name', 'host']);
   }
-  async findConfig(id: number): Promise<Epiphan> {
-    return this.epiphanRepository.findOne({
-      where: { id: id }
-    })
+  async findAllSelectFields(fields): Promise<Epiphan[]> {
+    return this.epiphanRepository.find({select: fields});
+  }
+  async findConfig(id: string): Promise<Epiphan> {
+    return await this.epiphanRepository.findOne({
+      where: {
+        _id: new ObjectID(id),
+      },
+      select: ['id', 'name', 'host', 'password'],
+    });
   }
   private backoffDelay(retryAttempt: number): number {
     return Math.min(10000, Math.pow(2, retryAttempt) * 1000);
@@ -72,16 +72,14 @@ export class EpiphanService {
       throw error
     });
   }
-  async addConfig(entity: CreateEpiphanDto) {
-    await this.epiphanRepository.insertOne(entity);
+  async addConfig(entity: CreateEpiphanDto): Promise<ObjectID> {
+    const result = await this.epiphanRepository.insertOne(entity);
+    return result.insertedId;
   }
 
   async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<any> {
-    //const epiphanConfig = await this.findConfig(data.id);
-    const epiphanConfig = <Epiphan>{
-      host: "test"
-    }
-    if (!epiphanConfig) {
+    const epiphanConfig = await this.findConfig(data.id);
+      if (!epiphanConfig) {
       this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
       throw new NotFoundException('Epiphan configuration not found!');
     }
@@ -89,7 +87,7 @@ export class EpiphanService {
     return firstValueFrom(this.httpService.post(`${epiphanConfig}/api/recorders/${data.channel}/control/start`, {}, {
       headers: headers
     }).pipe(
-        map((response) => response.data),
+        map((response) => response.data?.status.toLowerCase() === 'ok'),
         this.retryPolicy(),
         this.handleExceptions(),
       ));

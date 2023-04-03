@@ -9,12 +9,12 @@ export class EpiphanController {
   constructor(private readonly epiphanService: EpiphanService) {}
 
   @Get()
-  findAll(): Promise<Epiphan[]> {
-    return this.epiphanService.findAll();
+  async findAll(): Promise<Epiphan[]> {
+    return await this.epiphanService.findAll();
   }
   @Post('create')
   async add(@Body() createEpiphanDto: CreateEpiphanDto) {
-    await this.epiphanService.addConfig(createEpiphanDto);
+    return await this.epiphanService.addConfig(createEpiphanDto);
   }
   @MessagePattern({ cmd: 'testcmd' })
   testcmd(data: object): number {

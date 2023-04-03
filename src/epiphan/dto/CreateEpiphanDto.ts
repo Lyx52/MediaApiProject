@@ -1,12 +1,16 @@
-import { IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from "class-validator";
 
 export class CreateEpiphanDto {
-  @IsString({always: true})
+  @IsString()
+  @IsNotEmpty()
   readonly name: string;
-  @IsString({always: true})
+  @IsString()
+  @IsNotEmpty()
   readonly host: string;
-  @IsString({always: true})
+  @IsString()
+  @IsNotEmpty()
   readonly username: string;
-  @IsString({always: true})
+  @IsString()
+  @IsNotEmpty()
   readonly password: string;
 }
