@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Cron, SchedulerRegistry } from "@nestjs/schedule";
+import { Cron, Interval, SchedulerRegistry } from "@nestjs/schedule";
 import { CronCommand, CronJob } from "cron";
 import { InjectRepository } from "@nestjs/typeorm";
 import { ConferenceRoomSession } from "../entities/ConferenceRoomSession";
@@ -45,7 +45,7 @@ export class PlugNMeetTaskService {
       this.logger.log(`job: ${key} -> next: ${next}`);
     });
   }
-  @Cron("30 * * * * *", { name: "UpdateConfRoomActivity" })
+  @Interval("UpdateConfRoomActivity", 5000)
   async conferenceRoomActivityCheck() {
     const rooms = this.roomRepository.find({
       where: {
@@ -65,10 +65,12 @@ export class PlugNMeetTaskService {
     )
   }
   addRecorderPing(recorderId: string) {
-    this.addCronJob(`RECORDER_${recorderId}_PING`, 5, async () => await this.sendPing(recorderId))
+    this.schedulerRegistry.addInterval(`RECORDER_${recorderId}_PING`, setInterval(async () => await this.sendPing(recorderId), 5000))
   }
   deleteRecorderPing(recorderId: string) {
-    this.deleteCron(`RECORDER_${recorderId}_PING`);
+    if (this.schedulerRegistry.doesExist("interval", `RECORDER_${recorderId}_PING`)) {
+      this.schedulerRegistry.deleteInterval(`RECORDER_${recorderId}_PING`);
+    }
   }
 
   async sendPing(recorder_id: string) {

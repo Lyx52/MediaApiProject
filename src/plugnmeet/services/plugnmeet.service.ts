@@ -7,7 +7,7 @@ import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import { PLUGNMEET_RECORDER_INFO_KEY } from "../../app.constants";
 import { Recorder } from "../entities/Recorder";
-import { v1 as uuid1, stringify } from 'uuid';
+import { v1 as uuid1 } from 'uuid';
 import { PlugNMeetTaskService } from "./plugnmeet.task.service";
 import { PlugNMeetRecorderInfo } from "../dto/PlugNMeetRecorderInfo";
 import { PlugNMeetToRecorder } from "../../proto/plugnmeet_recorder_pb";
@@ -15,6 +15,7 @@ import { PlugNMeetToRecorder } from "../../proto/plugnmeet_recorder_pb";
 export class PlugNMeetService {
   private readonly logger = new Logger(PlugNMeetService.name);
   private readonly PNMController: PlugNmeet;
+
   constructor(
     @InjectRepository(ConferenceRoomSession) private readonly roomRepository: MongoRepository<ConferenceRoomSession>,
     @InjectRepository(ConferenceRoomSession) private readonly recorderRepository: MongoRepository<Recorder>,
@@ -32,7 +33,9 @@ export class PlugNMeetService {
   }
 
   async addRecorders(recorderCount: number) {
+    await this.recorderRepository.deleteMany({});
     const recorders = await this.recorderRepository.find();
+
     for (const recorder of recorders) {
       if (!recorder.isRecording) continue;
 
@@ -52,6 +55,7 @@ export class PlugNMeetService {
     }
     return recorderCount;
   }
+
   async addAvailableRecorder(recorderId: string) {
     try {
       const now = Math.floor(new Date().getTime() / 1000);
@@ -71,15 +75,27 @@ export class PlugNMeetService {
     // Add recorder pinging cronjob
     this.taskService.addRecorderPing(recorderId);
   }
-  async startRecording(payload: PlugNMeetToRecorder) {
-    if (await this.roomRepository.exist({ where: { roomSid: payload.roomSid, roomId: payload.roomId } })) return;
 
+  async startRecording(payload: PlugNMeetToRecorder) {
     const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } })
     if (recorder) {
-      await this.addConferenceSession(payload.roomId, payload.roomSid);
       await this.recorderRepository.updateOne({ _id: recorder.id }, {
-        $set: { roomId: payload.roomId,  }
+        $set: { roomId: payload.roomId, isRecording: true }
       })
+      // TODO: Send response
+      
+      this.taskService.deleteRecorderPing(recorder.recorderId);
+    }
+  }
+  async stopRecording(payload: PlugNMeetToRecorder) {
+    const recorder = await this.recorderRepository.findOne({ where: { roomId: payload.roomId } })
+    if (recorder) {
+      await this.recorderRepository.updateOne({ _id: recorder.id }, {
+        $set: { isRecording: false }
+      })
+      // TODO: Send response
+
+      this.taskService.addRecorderPing(recorder.recorderId);
     }
   }
   async addConferenceSession(roomId: string, roomSid: string) {
