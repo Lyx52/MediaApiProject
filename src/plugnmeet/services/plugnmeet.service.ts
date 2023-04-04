@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
-import { ConferenceRoomSession } from "../entities/ConferenceRoomSession";
 import { PlugNmeet } from 'plugnmeet-sdk-js';
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
@@ -17,8 +16,7 @@ export class PlugNMeetService {
   private readonly PNMController: PlugNmeet;
 
   constructor(
-    @InjectRepository(ConferenceRoomSession) private readonly roomRepository: MongoRepository<ConferenceRoomSession>,
-    @InjectRepository(ConferenceRoomSession) private readonly recorderRepository: MongoRepository<Recorder>,
+    @InjectRepository(Recorder) private readonly recorderRepository: MongoRepository<Recorder>,
     @InjectRedis() private readonly redisClient: Redis,
     private readonly taskService: PlugNMeetTaskService
   ) {
@@ -97,15 +95,5 @@ export class PlugNMeetService {
 
       this.taskService.addRecorderPing(recorder.recorderId);
     }
-  }
-  async addConferenceSession(roomId: string, roomSid: string) {
-    const roomEntity = this.roomRepository.create()
-    roomEntity.roomSid = roomSid;
-    roomEntity.roomId = roomId;
-    roomEntity.started = new Date().getTime();
-    roomEntity.ended = -1;
-    roomEntity.isActive = true;
-    roomEntity.isRecording = true;
-    await this.roomRepository.insertOne(roomEntity);
   }
 }

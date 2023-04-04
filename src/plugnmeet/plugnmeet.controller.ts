@@ -1,6 +1,6 @@
 import { Controller, Inject, Logger } from "@nestjs/common";
 import { PLUGNMEET_SERVICE } from "../app.constants";
-import { ClientProxy, Ctx, MessagePattern, Payload, RedisContext } from "@nestjs/microservices";
+import { ClientProxy, Ctx, MessagePattern, Payload } from "@nestjs/microservices";
 import { PlugNMeetService } from "./services/plugnmeet.service";
 import { PlugNMeetToRecorder, RecordingTasks } from "../proto/plugnmeet_recorder_pb";
 
@@ -10,7 +10,7 @@ export class PlugNMeetController {
   private readonly logger: Logger = new Logger(PlugNMeetService.name);
   constructor(private readonly pnmService: PlugNMeetService, @Inject(PLUGNMEET_SERVICE) private readonly client: ClientProxy) {}
   @MessagePattern('plug-n-meet-recorder')
-  async handlePlugNMeetMessage(@Payload() payload: PlugNMeetToRecorder, @Ctx() context: RedisContext) {
+  async handlePlugNMeetMessage(@Payload() payload: PlugNMeetToRecorder) {
     if (payload.from !== 'plugnmeet') return;
 
     switch (payload.task) {
@@ -21,6 +21,7 @@ export class PlugNMeetController {
       case RecordingTasks.STOP:
       case RecordingTasks.STOP_RECORDING: {
         this.logger.debug(`STOP_RECORDING for ${payload.roomSid} roomSid!`);
+        await this.pnmService.stopRecording(payload);
       } break;
     }
 

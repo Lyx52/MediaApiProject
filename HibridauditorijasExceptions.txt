@@ -1,0 +1,49 @@
+Order of execution
+	- Download Recordings
+		???
+	- Start livestreeam
+		1. Create livekit ingress session
+		2. Start epiphan RTMP stream
+	- Stop livestream
+		1. Stop epiphan RTMP stream
+		2. Delete livekit ingress session
+	- Start recording
+		
+Background tasks
+	- RecordingSarted
+		-> If recording is active create opencast event
+	- RecordingEnded
+		-> If recordng ended start recording ingest
+	- 
+Exceptions which will stop recording	
+	- Epiphan recording or stream cannot be started? 			
+		=> If epiphan is livestreaming then it can record, but can it record without livestreaming?
+	- Opencast event can be created?
+		=> If opencast fails to create event, does recording continue? 
+			-> If continue
+				- Advantage: Even if event is not cretated there still is recording to recover event from
+				- Disadvantage: Event needs to be created and files uploaded manuallys (File stays on epiphan or gets uploaded somewhere?)
+			-> If dont continue
+				- Advantage: System will always try to work in the intended way, without any compensation or manual labor
+				- Disadvantage: More chances of downtime
+		=> If opencast fails to upload files? After recording is finished...
+			-> 
+Exception approaches
+	-> Only throw recording error if critical parts of recording fail to launch.
+	-> Always throw if any exception occurs
+
+Epiphan
+	* Common exceptions
+		- Bad config id
+		- Device not reachable
+		- Invalid auth config
+		- Generic error response?
+		- Epipphan Layout/Channel does not exist
+	- Start recording
+		- Recording already started?
+	- Stop recording
+		- Recording already stopped?
+	- Start RTMP Stream
+		- Stream already started? With different streamId?
+	- Stop RTMP Stream
+		- Stream already stopped?

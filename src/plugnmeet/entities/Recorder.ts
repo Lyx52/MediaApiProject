@@ -1,6 +1,4 @@
 import { Column, Entity, JoinColumn, ManyToOne, ObjectID, ObjectIdColumn } from "typeorm";
-import { ConferenceRoomSession } from "./ConferenceRoomSession";
-
 @Entity()
 export class Recorder {
   @ObjectIdColumn()
@@ -9,11 +7,6 @@ export class Recorder {
   recorderId: string;
   @Column()
   isRecording: boolean;
-
   @Column()
-  roomId: string;
-
-  @ManyToOne(() => ConferenceRoomSession, (entity: ConferenceRoomSession) => entity.id)
-  @JoinColumn({ name: 'roomId' })
-  conferenceRoom: ConferenceRoomSession;
+  roomSid: string;
 }
