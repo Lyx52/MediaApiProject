@@ -7,13 +7,13 @@ import { PlugNMeetTaskService } from "./services/plugnmeet.task.service";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Epiphan } from "../epiphan/epiphan.entity";
-import { ConferenceRoom } from "./entities/ConferenceRoom";
+import { ConferenceRoomSession } from "./entities/ConferenceRoomSession";
 import { Recorder } from "./entities/Recorder";
 import { RedisModule } from "@liaoliaots/nestjs-redis";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ConferenceRoom, Recorder]),
+    TypeOrmModule.forFeature([ConferenceRoomSession, Recorder]),
     ClientsModule.register([{ name: PLUGNMEET_SERVICE, transport: Transport.TCP }]),
     ScheduleModule.forRoot(),
     RedisModule.forRoot({

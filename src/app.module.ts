@@ -4,7 +4,7 @@ import { Epiphan } from "./epiphan/epiphan.entity";
 import { EpiphanModule } from "./epiphan/epiphan.module";
 import { PlugNMeetModule } from "./plugnmeet/plugnmeet.module";
 import { LivekitModule } from "./livekit/livekit.module";
-import { ConferenceRoom } from "./plugnmeet/entities/ConferenceRoom";
+import { ConferenceRoomSession } from "./plugnmeet/entities/ConferenceRoomSession";
 import { Recorder } from "./plugnmeet/entities/Recorder";
 @Module({
   imports: [
@@ -12,7 +12,7 @@ import { Recorder } from "./plugnmeet/entities/Recorder";
       type: 'mongodb',
       host: 'localhost',
       database: 'LbtuMediaDb',
-      entities: [Epiphan, ConferenceRoom, Recorder],
+      entities: [Epiphan, ConferenceRoomSession, Recorder],
       synchronize: true,
       useUnifiedTopology: true,
     }),

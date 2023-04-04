@@ -2,13 +2,19 @@ import { Column, Entity, JoinColumn, ManyToOne, ObjectID, ObjectIdColumn } from 
 import { Recorder } from "./Recorder";
 
 @Entity()
-export class ConferenceRoom {
+export class ConferenceRoomSession {
   @ObjectIdColumn()
   id: ObjectID;
   @Column()
-  sid: string;
+  roomSid: string;
   @Column()
-  started: bigint;
+  roomId: string;
   @Column()
-  ended: bigint;
+  started: number;
+  @Column()
+  ended: number;
+  @Column()
+  isActive: boolean;
+  @Column()
+  isRecording: boolean;
 }

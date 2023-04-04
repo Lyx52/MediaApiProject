@@ -16,7 +16,7 @@ export class PlugNMeetController {
     switch (payload.task) {
       case RecordingTasks.START_RECORDING: {
         this.logger.debug(`START_RECORDING for ${payload.roomSid} roomSid!`);
-        await this.pnmService.addConferenceRoom(payload.roomId, payload.roomSid);
+        await this.pnmService.startRecording(payload);
       } break;
       case RecordingTasks.STOP:
       case RecordingTasks.STOP_RECORDING: {

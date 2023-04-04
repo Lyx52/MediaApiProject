@@ -2,11 +2,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, SchedulerRegistry } from "@nestjs/schedule";
 import { CronCommand, CronJob } from "cron";
 import { InjectRepository } from "@nestjs/typeorm";
-import { ConferenceRoom } from "../entities/ConferenceRoom";
+import { ConferenceRoomSession } from "../entities/ConferenceRoomSession";
 import { MongoRepository } from "typeorm";
 import Redis from "ioredis";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
-import { PlugNMeetRecorderInfo } from "../dto/RecorderHashInfo";
+import { PlugNMeetRecorderInfo } from "../dto/PlugNMeetRecorderInfo";
 import { PLUGNMEET_RECORDER_INFO_KEY } from "../../app.constants";
 @Injectable()
 export class PlugNMeetTaskService {
@@ -15,7 +15,7 @@ export class PlugNMeetTaskService {
   constructor(
     private schedulerRegistry: SchedulerRegistry,
     @InjectRedis() private readonly redisClient: Redis,
-    @InjectRepository(ConferenceRoom) private readonly roomRepository: MongoRepository<ConferenceRoom>
+    @InjectRepository(ConferenceRoomSession) private readonly roomRepository: MongoRepository<ConferenceRoomSession>
   ) {
 
   }
@@ -52,7 +52,7 @@ export class PlugNMeetTaskService {
         isActive: true,
         ended: { $gt: 0 }
       },
-      select: ['id', 'sid']
+      select: ['id', 'roomSid']
     })
     await this.roomRepository.updateMany(
       {
