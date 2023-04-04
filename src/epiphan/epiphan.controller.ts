@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
-import { EpiphanService } from "./epiphan.service";
+import { EpiphanService } from "./services/epiphan.service";
 import { Epiphan } from "./epiphan.entity";
 import { CreateEpiphanDto } from "./dto/CreateEpiphanDto";
 import { MessagePattern } from "@nestjs/microservices";

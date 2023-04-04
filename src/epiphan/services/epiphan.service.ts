@@ -3,10 +3,10 @@ import { handleRetry, InjectRepository } from "@nestjs/typeorm";
 import { AxiosResponse, AxiosError } from 'axios';
 import { FindOptionsSelect, MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
-import { Epiphan } from "./epiphan.entity";
-import { CreateEpiphanDto } from "./dto/CreateEpiphanDto";
+import { Epiphan } from "../epiphan.entity";
+import { CreateEpiphanDto } from "../dto/CreateEpiphanDto";
 import { HttpService } from "@nestjs/axios";
-import { StartEpiphanRecordingDto } from "./dto/StartEpiphanRecordingDto";
+import { StartEpiphanRecordingDto } from "../dto/StartEpiphanRecordingDto";
 import {
   catchError,
   delay,

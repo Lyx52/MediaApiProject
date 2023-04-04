@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Epiphan } from "./epiphan.entity";
-import { EpiphanService } from "./epiphan.service";
+import { EpiphanService } from "./services/epiphan.service";
 import { EpiphanController } from "./epiphan.controller";
 import { HttpModule } from "@nestjs/axios";
 
