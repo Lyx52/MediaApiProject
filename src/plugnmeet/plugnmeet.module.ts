@@ -8,7 +8,10 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Recorder } from "./entities/Recorder";
 import { RedisModule } from "@liaoliaots/nestjs-redis";
-
+import { HttpModule } from "@nestjs/axios";
+import { ConfigModule } from "@nestjs/config";
+import config from '../common/utils/config.yaml';
+import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
 @Module({
   imports: [
     TypeOrmModule.forFeature([Recorder]),
@@ -24,8 +27,13 @@ import { RedisModule } from "@liaoliaots/nestjs-redis";
         db: 0,
       },
     }),
+    HttpModule.register({
+      timeout: 5000,
+      maxRedirects: 5,
+    }),
+    ConfigModule.forRoot({ load: [config] }),
   ],
-  providers: [PlugNMeetService, PlugNMeetTaskService],
+  providers: [PlugNMeetService, PlugNMeetTaskService, PlugNMeetHttpService],
   controllers: [PlugNMeetController],
 })
 export class PlugNMeetModule {}

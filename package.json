@@ -25,6 +25,7 @@
     "@liaoliaots/nestjs-redis": "^9.0.5",
     "@nestjs/axios": "^2.0.0",
     "@nestjs/common": "9.3.12",
+    "@nestjs/config": "^2.3.1",
     "@nestjs/core": "9.3.12",
     "@nestjs/microservices": "^9.3.12",
     "@nestjs/platform-express": "9.3.12",

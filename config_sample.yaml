@@ -1,0 +1,24 @@
+appconfig:
+  max_retries: 5
+  max_recorders: 2
+  ingress_capture: false
+  epiphan_capture: false
+  port: 9999
+plugnmeet:
+  host: PLUG_N_MEET_SERVER_DOMAIN
+  key: PLUG_N_MEET_API_KEY
+  secret: PLUG_N_MEET_SECRET
+redis:
+  host: localhost
+  port: 6379
+  username: ""
+  password: ""
+  db: 0
+livekit:
+  host: LIVEKIT_SERVER_DOMAIN
+  key: LIVEKIT_API_KEY
+  secret: LIVEKIT_SECRET
+opencast:
+  host: OPENCAST_HOSTNAME
+  username: OPENCAST_USERNAME
+  password: OPENCAST_PASSWORD

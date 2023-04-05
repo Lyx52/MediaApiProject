@@ -18,6 +18,7 @@ import {
   firstValueFrom,
   retry, filter, of, mergeWith, pipe
 } from "rxjs";
+import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../common/utils/axios.utils";
 
 @Injectable()
 export class EpiphanService {
@@ -28,13 +29,6 @@ export class EpiphanService {
     private readonly httpService: HttpService
   ) {}
 
-  private makeAuthHeader(config: Epiphan): object {
-    return {
-      Authorization: `Basic ${Buffer.from(
-        `${config.username}:${config.password}`,
-      ).toString('base64')}`,
-    };
-  }
   async findAll(): Promise<Epiphan[]> {
     return this.findAllSelectFields(['id', 'name', 'host']);
   }
@@ -49,29 +43,6 @@ export class EpiphanService {
       select: ['id', 'name', 'host', 'password'],
     });
   }
-  private backoffDelay(retryAttempt: number): number {
-    return Math.min(10000, Math.pow(2, retryAttempt) * 1000);
-  }
-  private retryPolicy() {
-    return retry({ delay: (error, index) => timer(this.backoffDelay(index)), resetOnSuccess: true, count: 3 });
-  }
-  private handleExceptions() {
-    return catchError((error: AxiosError) => {
-      this.logger.error('Caught error in caller service...')
-      if (error.response) {
-        // Server responded with a non-2xx status code
-        const { status, data } = error.response;
-        throw `Request failed with status code ${status}: ${data}`;
-      } else if (error.request) {
-        // No response was received from the server
-        throw 'Request failed: no response received from server';
-      } else {
-        // Request was never sent due to a client-side error
-        throw `Request failed: client-side error ${error}`;
-      }
-      throw error
-    });
-  }
   async addConfig(entity: CreateEpiphanDto): Promise<ObjectID> {
     const result = await this.epiphanRepository.insertOne(entity);
     return result.insertedId;
@@ -83,13 +54,13 @@ export class EpiphanService {
       this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
       throw new NotFoundException('Epiphan configuration not found!');
     }
-    const headers = this.makeAuthHeader(epiphanConfig);
+    const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
     return firstValueFrom(this.httpService.post(`${epiphanConfig}/api/recorders/${data.channel}/control/start`, {}, {
       headers: headers
     }).pipe(
         map((response) => response.data?.status.toLowerCase() === 'ok'),
-        this.retryPolicy(),
-        this.handleExceptions(),
+        retryPolicy(),
+        handleAxiosExceptions(),
       ));
   }
 }

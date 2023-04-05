@@ -6,4 +6,4 @@ services:
     environment:
       - MONGODB_DATABASE="LbtuMediaDb"
     ports:
-      - 27017:27017
+      - "27017:27017"

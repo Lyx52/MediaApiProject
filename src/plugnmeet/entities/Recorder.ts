@@ -1,4 +1,8 @@
 import { Column, Entity, JoinColumn, ManyToOne, ObjectID, ObjectIdColumn } from "typeorm";
+
+/**
+ * Entity that holds one "recorder instance", recorder count is limited
+ */
 @Entity()
 export class Recorder {
   @ObjectIdColumn()

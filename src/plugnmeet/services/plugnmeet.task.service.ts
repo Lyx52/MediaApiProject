@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import Redis from "ioredis";
-import { ConferenceRoomSession } from "../entities/ConferenceRoomSession";
 import { InjectRepository } from "@nestjs/typeorm";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import { MongoRepository } from "typeorm";
@@ -15,7 +14,6 @@ export class PlugNMeetTaskService {
   constructor(
     private schedulerRegistry: SchedulerRegistry,
     @InjectRedis() private readonly redisClient: Redis,
-    @InjectRepository(ConferenceRoomSession) private readonly roomRepository: MongoRepository<ConferenceRoomSession>,
   ) {
   }
   addRecorderPing(recorderId: string) {
