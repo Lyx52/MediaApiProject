@@ -16,14 +16,6 @@ import { OpencastModule } from "./opencast/opencast.module";
       entities: [Epiphan, Recorder],
       synchronize: true,
       useUnifiedTopology: true,
-      ssl: false,
-      retryAttempts: 1,
-      dropSchema: true,
-      extra: {
-        ssl: {
-          rejectUnauthorized: false,
-        },
-      },
     }),
     EpiphanModule, PlugNMeetModule, LivekitModule, OpencastModule
   ],

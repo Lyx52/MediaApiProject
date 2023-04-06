@@ -17,13 +17,13 @@ export class PlugNMeetTaskService {
   ) {
   }
   addRecorderPing(recorderId: string) {
-    this.schedulerRegistry.addInterval(`RECORDER_${recorderId}_PING`, setInterval(async () => await this.sendPing(recorderId), 5000));
-    this.logger.debug(`RECORDER_${recorderId}_PING added to scheduler`);
+    this.schedulerRegistry.addInterval(`${recorderId}_PING`, setInterval(async () => await this.sendPing(recorderId), 5000));
+    this.logger.debug(`${recorderId}_PING added to scheduler`);
   }
   deleteRecorderPing(recorderId: string) {
-    if (this.schedulerRegistry.doesExist("interval", `RECORDER_${recorderId}_PING`)) {
-      this.schedulerRegistry.deleteInterval(`RECORDER_${recorderId}_PING`);
-      this.logger.debug(`RECORDER_${recorderId}_PING removed from scheduler`);
+    if (this.schedulerRegistry.doesExist("interval", `${recorderId}_PING`)) {
+      this.schedulerRegistry.deleteInterval(`${recorderId}_PING`);
+      this.logger.debug(`${recorderId}_PING removed from scheduler`);
     }
   }
   async sendPing(recorder_id: string) {

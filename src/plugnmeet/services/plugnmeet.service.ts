@@ -12,7 +12,6 @@ import {
   START_LIVEKIT_EGRESS_RECORDING, START_OPENCAST_INGEST, STOP_EPIPHAN_RECORDING, STOP_LIVEKIT_EGRESS_RECORDING
 } from "../../app.constants";
 import { Recorder } from "../entities/Recorder";
-import { v1 as uuid1 } from 'uuid';
 import { PlugNMeetTaskService } from "./plugnmeet.task.service";
 import { PlugNMeetRecorderInfo } from "../dto/PlugNMeetRecorderInfo";
 import { PlugNMeetToRecorder, RecorderToPlugNMeet, RecordingTasks } from "../../proto/plugnmeet_recorder_pb";
@@ -25,6 +24,7 @@ import { StopEgressRecordingDto } from "../../livekit/dto/StopEgressRecordingDto
 import { CreateOpencastEventDto } from "../../opencast/dto/CreateOpencastEventDto";
 import { PlugNMeetHttpService } from "./plugnmeet.http.service";
 import { StartOpencastIngestDto } from "../../opencast/dto/StartOpencastIngestDto";
+import { randomStringGenerator } from "@nestjs/common/utils/random-string-generator.util";
 @Injectable()
 export class PlugNMeetService {
   private readonly logger = new Logger(PlugNMeetService.name);
@@ -43,27 +43,37 @@ export class PlugNMeetService {
       config.getOrThrow<string>('plugnmeet.key'),
       config.getOrThrow<string>('plugnmeet.secret'),
     );
-
     this.addRecorders(config.getOrThrow<number>('appconfig.max_recorders'))
       .then(r => this.logger.debug(`Added ${r} recorders...`));
   }
-
+  makeRecorderId(length) {
+    let result = 'RECORDER_';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+  }
   async addRecorders(recorderCount: number) {
     const recorders = await this.recorderRepository.find();
 
     for (const recorder of recorders) {
-      const recorderInfo = await this.redisClient.hget(PLUGNMEET_RECORDER_INFO_KEY, recorder.recorderId);
-
-      //TODO: Check if recorder is actually recording
-      if (recorderInfo) {
-        const recorderInfoObj = JSON.parse(recorderInfo);
-
+      // Recorder is recording
+      if (recorder.isRecording) {
+        // Check if the room exists/is recording
+        const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: recorder.roomId });
+        // TODO: Possible fix to stupid logic?
+        if (roomInfo.status && roomInfo.room) {
+          if (roomInfo.room.room_info.is_recording) continue;
+        }
       }
 
-      // No recorder info available assume not recording...
-      await this.recorderRepository.updateOne({ _id: recorder.id }, {
-        $set: { isRecording: false }
-      })
+      // Assume not recording...
+      recorder.isRecording = false;
+      await this.recorderRepository.save(recorder);
       await this.addAvailableRecorder(recorder.recorderId);
     }
 
@@ -71,7 +81,7 @@ export class PlugNMeetService {
     for (let i = 0; i < (recorderCount - recorders.length); i++) {
       const recorder = this.recorderRepository.create();
       recorder.isRecording = false;
-      recorder.recorderId = `RECORDER_${uuid1()}`
+      recorder.recorderId = this.makeRecorderId(16);
       await this.addAvailableRecorder(recorder.recorderId);
       await this.recorderRepository.insert(recorder);
     }
@@ -79,6 +89,7 @@ export class PlugNMeetService {
   }
 
   async addAvailableRecorder(recorderId: string) {
+
     try {
       const now = Math.floor(new Date().getTime() / 1000);
       const recorderInfo: any = {};
@@ -99,21 +110,6 @@ export class PlugNMeetService {
   }
 
   async startRecording(payload: PlugNMeetToRecorder) {
-    await this.httpService.sendMessage(
-      new RecorderToPlugNMeet({
-        from: 'recorder',
-        status: true,
-        task: RecordingTasks.START_RECORDING,
-        msg: 'started',
-        recordingId: payload.recordingId,
-        roomSid: payload.roomSid,
-        roomId: payload.roomId,
-        recorderId: payload.recorderId,
-      }),
-      true,
-      payload.recorderId,
-    );
-    return;
     const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } })
     if (recorder) {
       // Start livekit egress recording
@@ -136,29 +132,31 @@ export class PlugNMeetService {
       }
 
       // Set recorder as currently recording
-      await this.recorderRepository.updateOne({ _id: recorder.id }, {
-        $set: { roomId: payload.roomId, isRecording: true }
-      })
-      //this.taskService.deleteRecorderPing(recorder.recorderId);
+      recorder.isRecording = true;
+      recorder.roomSid = payload.roomSid;
+      recorder.roomId = payload.roomId;
+      await this.recorderRepository.save(recorder, );
+      this.taskService.deleteRecorderPing(recorder.recorderId);
 
       this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{});
-      await this.httpService.sendStartedMessage(payload);
+      await this.httpService.sendStartedMessage(payload, recorder.recorderId);
       return;
     }
     this.logger.error('No recorder is available!');
     await this.httpService.sendErrorMessage(payload);
   }
   async stopRecording(payload: PlugNMeetToRecorder) {
-    const recorder = await this.recorderRepository.findOne({ where: { roomId: payload.roomId } })
+    const recorder = await this.recorderRepository.findOne({ where: { roomSid: payload.roomSid } })
+
     if (recorder) {
       // Emit events to stop recordings...
       this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{});
       this.client.emit(STOP_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{});
 
-      await this.recorderRepository.updateOne({ _id: recorder.id }, {
-        $set: { isRecording: false }
-      })
-      //this.taskService.addRecorderPing(recorder.recorderId);
+      recorder.isRecording = false;
+      await this.recorderRepository.save(recorder);
+
+      this.taskService.addRecorderPing(recorder.recorderId);
       await this.httpService.sendEndedMessage(payload, recorder.recorderId);
       await this.httpService.sendCompletedMessage(payload, recorder.recorderId);
 
@@ -166,7 +164,7 @@ export class PlugNMeetService {
       this.client.emit(START_OPENCAST_INGEST, <StartOpencastIngestDto>{});
       return;
     }
-    this.logger.error(`Recorder dosn''t exist for room ${payload.roomSid}!`);
+    this.logger.error(`Recorder dosn't exist for room ${payload.roomSid}!`);
     await this.httpService.sendErrorMessage(payload);
   }
 }
