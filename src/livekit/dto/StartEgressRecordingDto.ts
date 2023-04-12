@@ -3,14 +3,8 @@ import { IsNotEmpty, IsString } from "class-validator";
 export class StartEgressRecordingDto {
   @IsString()
   @IsNotEmpty()
-  readonly name: string;
+  readonly roomId: string;
   @IsString()
   @IsNotEmpty()
-  readonly host: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly username: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly password: string;
+  readonly recorderId: string;
 }

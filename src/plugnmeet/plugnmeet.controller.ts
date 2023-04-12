@@ -8,7 +8,7 @@ import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
 @Controller('plugnmeet')
 export class PlugNMeetController {
 
-  private readonly logger: Logger = new Logger(PlugNMeetService.name);
+  private readonly logger: Logger = new Logger(PlugNMeetController.name);
   constructor(
     private readonly pnmService: PlugNMeetService,
     private readonly httpService: PlugNMeetHttpService,

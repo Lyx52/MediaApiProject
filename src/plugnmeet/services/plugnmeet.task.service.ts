@@ -5,7 +5,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import { MongoRepository } from "typeorm";
 import { PLUGNMEET_RECORDER_INFO_KEY } from "src/app.constants";
-import { PlugNMeetRecorderInfo } from "../dto/PlugNMeetRecorderInfo";
+import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
 
 @Injectable()
 export class PlugNMeetTaskService {
@@ -36,7 +36,7 @@ export class PlugNMeetTaskService {
       const info = await this.redisClient.hget(PLUGNMEET_RECORDER_INFO_KEY, recorder_id);
       if (!info) return;
 
-      const currentInfo: PlugNMeetRecorderInfo = JSON.parse(info);
+      const currentInfo: PlugNMeetRecorderInfoDto = JSON.parse(info);
       currentInfo.lastPing = Math.floor(new Date().getTime() / 1000);
 
       // update again

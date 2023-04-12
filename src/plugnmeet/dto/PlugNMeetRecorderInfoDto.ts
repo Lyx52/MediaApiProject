@@ -1,4 +1,4 @@
-export interface PlugNMeetRecorderInfo {
+export interface PlugNMeetRecorderInfoDto {
   maxLimit: number;
   currentProgress: number;
   lastPing: number;

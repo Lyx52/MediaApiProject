@@ -13,7 +13,7 @@ import {
 } from "../../app.constants";
 import { Recorder } from "../entities/Recorder";
 import { PlugNMeetTaskService } from "./plugnmeet.task.service";
-import { PlugNMeetRecorderInfo } from "../dto/PlugNMeetRecorderInfo";
+import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
 import { PlugNMeetToRecorder, RecorderToPlugNMeet, RecordingTasks } from "../../proto/plugnmeet_recorder_pb";
 import { ConfigService } from "@nestjs/config";
 import { ClientProxy } from "@nestjs/microservices";
@@ -93,7 +93,7 @@ export class PlugNMeetService {
     try {
       const now = Math.floor(new Date().getTime() / 1000);
       const recorderInfo: any = {};
-      recorderInfo[recorderId] = JSON.stringify(<PlugNMeetRecorderInfo>{
+      recorderInfo[recorderId] = JSON.stringify(<PlugNMeetRecorderInfoDto>{
         maxLimit: 1,
         currentProgress: 0,
         lastPing: now,
@@ -113,7 +113,10 @@ export class PlugNMeetService {
     const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } })
     if (recorder) {
       // Start livekit egress recording
-      if (!await firstValueFrom(this.client.send<boolean>(START_LIVEKIT_EGRESS_RECORDING, <StartEgressRecordingDto>{})))
+      if (!await firstValueFrom(this.client.send<boolean>(START_LIVEKIT_EGRESS_RECORDING, <StartEgressRecordingDto>{
+        recorderId: recorder.recorderId,
+        roomId: payload.roomId,
+      })))
       {
         // Cannot start livekit egress recording
         this.logger.error('Failed to start livekit egress recording!');
@@ -150,7 +153,10 @@ export class PlugNMeetService {
 
     if (recorder) {
       // Emit events to stop recordings...
-      this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{});
+      this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+        recorderId: recorder.recorderId,
+        roomSid:  recorder.roomSid,
+      });
       this.client.emit(STOP_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{});
 
       recorder.isRecording = false;

@@ -14,6 +14,11 @@ export const STOP_LIVEKIT_EGRESS_RECORDING = { cmd: "stopLivekitEgressRecording"
 export const STOP_EPIPHAN_RECORDING = { cmd: "stopEpiphanRecording" }
 export const CREATE_OPENCAST_EVENT = { cmd: "createOpencastEvent" }
 export const START_OPENCAST_INGEST = { cmd: "startOpencastIngest" }
-
+export const OPENCAST_ADD_MEDIA = { cmd: "addToOpencastQueue" }
 
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';
+
+export enum MediaType {
+  EPIPHAN_MEDIA,
+  EGRESS_MEDIA
+}

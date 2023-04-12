@@ -6,6 +6,8 @@ import { PlugNMeetModule } from "./plugnmeet/plugnmeet.module";
 import { LivekitModule } from "./livekit/livekit.module";
 import { Recorder } from "./plugnmeet/entities/Recorder";
 import { OpencastModule } from "./opencast/opencast.module";
+import { EgressSession } from "./livekit/entities/EgressSession";
+import { BullModule } from "@nestjs/bull";
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -13,9 +15,16 @@ import { OpencastModule } from "./opencast/opencast.module";
       host: 'localhost',
       database: 'LbtuMediaDb',
       port: 27017,
-      entities: [Epiphan, Recorder],
+      entities: [Epiphan, Recorder, EgressSession],
       synchronize: true,
       useUnifiedTopology: true,
+      dropSchema: true // DELETE THIS
+    }),
+    BullModule.forRoot({
+      redis: {
+        host: '85.254.205.116',
+        port: 6379,
+      },
     }),
     EpiphanModule, PlugNMeetModule, LivekitModule, OpencastModule
   ],
