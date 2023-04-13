@@ -129,7 +129,10 @@ export class PlugNMeetService {
       {
         // Cannot start epiphan recording
         this.logger.error('Failed to start epiphan recording!');
-        this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{});
+        this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+          recorderId: recorder.recorderId,
+          roomSid:  recorder.roomSid,
+        });
         await this.httpService.sendErrorMessage(payload, recorder.recorderId);
         return;
       }

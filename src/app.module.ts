@@ -18,7 +18,6 @@ import { BullModule } from "@nestjs/bull";
       entities: [Epiphan, Recorder, EgressSession],
       synchronize: true,
       useUnifiedTopology: true,
-      dropSchema: true // DELETE THIS
     }),
     BullModule.forRoot({
       redis: {

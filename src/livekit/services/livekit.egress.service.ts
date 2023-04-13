@@ -28,28 +28,36 @@ export class LivekitEgressService {
       this.config.getOrThrow<string>("livekit.secret"),
     );
   }
+  async stopEgressOrRetry(data: StopEgressRecordingDto, session: EgressSession, retries= 0) {
+    try {
+      const info = await this.egressClient.stopEgress(session.egressId);
+      const files = info.fileResults;
+      if (files) {
+        // Add each file to opencast queue
+        for (const file of files) {
+          this.client.emit(OPENCAST_ADD_MEDIA, <AddMediaDto>{
+            recorderId: data.recorderId,
+            roomSid: data.roomSid,
+            uri: file.filename,
+            type: MediaType.EPIPHAN_MEDIA
+          });
+        }
+      }
+    } catch (e) {
+      this.logger.error(`Failed to stop egress ${session.egressId}!`);
+      if (retries <= 3) {
+        // Await 1 second, maybe we are trying to stop the egress before its been initialized.
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return this.stopEgressOrRetry(data, session, retries + 1);
+      }
+    }
+  }
   async stopEgressRecording(data: StopEgressRecordingDto) {
     const activeSessions = await this.egressSessionRepository.find({
       where: { recorderId: data.recorderId, status: EgressStatus.EGRESS_ACTIVE }
     });
     for (const session of activeSessions) {
-      try {
-        const info = await this.egressClient.stopEgress(session.egressId);
-        const files = info.fileResults;
-        if (files) {
-          // Add each file to opencast queue
-          for (const file of files) {
-            this.client.emit(OPENCAST_ADD_MEDIA, <AddMediaDto>{
-              recorderId: data.recorderId,
-              roomSid: data.roomSid,
-              uri: file.filename,
-              type: MediaType.EPIPHAN_MEDIA
-            });
-          }
-        }
-      } catch (e) {
-        this.logger.error(`Failed to egress ${session.egressId}!`);
-      }
+      await this.stopEgressOrRetry(data, session);
       // In any case, set egress as complete
       session.status = EgressStatus.EGRESS_COMPLETE;
       await this.egressSessionRepository.save(session);

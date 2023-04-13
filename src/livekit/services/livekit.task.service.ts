@@ -24,6 +24,7 @@ export class LivekitTaskService {
       this.config.getOrThrow<string>("livekit.key"),
       this.config.getOrThrow<string>("livekit.secret"),
     );
+    // TODO: This Sync task should run at startup...
   }
   @Cron('30 * * * * *')
   async syncEgressSessions() {

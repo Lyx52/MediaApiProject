@@ -20,21 +20,23 @@ export class EpiphanController {
   async add(@Body() createEpiphanDto: CreateEpiphanDto) {
     return await this.epiphanService.addConfig(createEpiphanDto);
   }
-  @MessagePattern({ cmd: 'testcmd' })
-  testcmd(data: object): number {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-
-    return (data.data || []).reduce((a, b) => a + b);
-  }
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
     this.logger.debug("START_EPIPHAN_RECORDING");
-    return true;
+    return this.epiphanService.startEpiphanRecording(<StartEpiphanRecordingDto>{
+      channel: 1,
+      roomSid: "",
+      id: "643804a61caa577b141bfe2f"
+    });
   }
 
   @EventPattern(STOP_EPIPHAN_RECORDING)
   async stopEpiphanRecording(@Body() data: StopEpiphanRecordingDto) {
     this.logger.debug("STOP_EPIPHAN_RECORDING");
+    return this.epiphanService.stopEpiphanRecording(<StopEpiphanRecordingDto>{
+      channel: 1,
+      roomSid: "",
+      id: "643804a61caa577b141bfe2f"
+    });
   }
 }

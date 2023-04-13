@@ -5,11 +5,10 @@ export function backoffDelay(retryAttempt: number): number {
   return Math.min(10000, Math.pow(2, retryAttempt) * 1000);
 }
 export function retryPolicy() {
-  return retry({ delay: (error, index) => timer(this.backoffDelay(index)), resetOnSuccess: true, count: 3 });
+  return retry({ delay: (error, index) => timer(backoffDelay(index)), resetOnSuccess: true, count: 3 });
 }
 export function handleAxiosExceptions() {
   return catchError((error: AxiosError) => {
-    this.logger.error('Caught error in caller service...')
     if (error.response) {
       // Server responded with a non-2xx status code
       const { status, data } = error.response;

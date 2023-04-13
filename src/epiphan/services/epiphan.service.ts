@@ -19,6 +19,7 @@ import {
   retry, filter, of, mergeWith, pipe
 } from "rxjs";
 import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../common/utils/axios.utils";
+import { StopEpiphanRecordingDto } from "../dto/StopEpiphanRecordingDto";
 
 @Injectable()
 export class EpiphanService {
@@ -40,27 +41,57 @@ export class EpiphanService {
       where: {
         _id: new ObjectID(id),
       },
-      select: ['id', 'name', 'host', 'password'],
+      select: ['id', 'name', 'host', 'password', 'username'],
     });
   }
   async addConfig(entity: CreateEpiphanDto): Promise<ObjectID> {
     const result = await this.epiphanRepository.insertOne(entity);
     return result.insertedId;
   }
-
-  async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<any> {
+  async stopEpiphanRecording(data: StopEpiphanRecordingDto): Promise<boolean> {
     const epiphanConfig = await this.findConfig(data.id);
-      if (!epiphanConfig) {
+
+    if (!epiphanConfig) {
       this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
-      throw new NotFoundException('Epiphan configuration not found!');
+      return false;
     }
-    const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-    return firstValueFrom(this.httpService.post(`${epiphanConfig}/api/recorders/${data.channel}/control/start`, {}, {
-      headers: headers
-    }).pipe(
-        map((response) => response.data?.status.toLowerCase() === 'ok'),
+    try {
+      const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
+      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}api/recorders/${data.channel}/control/stop`, {}, {
+        headers: headers
+      }).pipe(
+        map((response) => response.data),
         retryPolicy(),
         handleAxiosExceptions(),
       ));
+      // TODO: Ingest into opencast...
+      return response && response.status == "ok";
+    } catch (e) {
+      this.logger.error(`Error while starting Epiphan: ${e}`);
+      return false;
+    }
+  }
+  async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<boolean> {
+    const epiphanConfig = await this.findConfig(data.id);
+
+    if (!epiphanConfig) {
+      this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
+      return false;
+    }
+    try {
+      const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
+      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}api/recorders/${data.channel}/control/start`, {}, {
+        headers: headers
+      }).pipe(
+        map((response) => response.data),
+        retryPolicy(),
+        handleAxiosExceptions(),
+      ));
+      // TODO: Ingest into opencast...
+      return response && response.status == "ok";
+    } catch (e) {
+      this.logger.error(`Error while starting Epiphan: ${e}`);
+      return false;
+    }
   }
 }
