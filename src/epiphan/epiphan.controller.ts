@@ -14,14 +14,15 @@ export class EpiphanController {
 
   @Get()
   async findAll(): Promise<Epiphan[]> {
-    return await this.epiphanService.findAll();
+    return this.epiphanService.findAll();
   }
   @Post('create')
   async add(@Body() createEpiphanDto: CreateEpiphanDto) {
-    return await this.epiphanService.addConfig(createEpiphanDto);
+    return this.epiphanService.addConfig(createEpiphanDto);
   }
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
+    return true;
     this.logger.debug("START_EPIPHAN_RECORDING");
     return this.epiphanService.startEpiphanRecording(<StartEpiphanRecordingDto>{
       channel: 1,
@@ -32,8 +33,9 @@ export class EpiphanController {
 
   @EventPattern(STOP_EPIPHAN_RECORDING)
   async stopEpiphanRecording(@Body() data: StopEpiphanRecordingDto) {
+    return;
     this.logger.debug("STOP_EPIPHAN_RECORDING");
-    return this.epiphanService.stopEpiphanRecording(<StopEpiphanRecordingDto>{
+    await this.epiphanService.stopEpiphanRecording(<StopEpiphanRecordingDto>{
       channel: 1,
       roomSid: "",
       id: "643804a61caa577b141bfe2f"

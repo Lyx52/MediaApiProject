@@ -6,11 +6,8 @@ export class CreateOpencastEventDto {
   readonly name: string;
   @IsString()
   @IsNotEmpty()
-  readonly host: string;
+  readonly roomSid: string;
   @IsString()
   @IsNotEmpty()
-  readonly username: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly password: string;
+  readonly recorderId: string;
 }

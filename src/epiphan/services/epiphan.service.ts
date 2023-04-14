@@ -37,7 +37,7 @@ export class EpiphanService {
     return this.epiphanRepository.find({select: fields});
   }
   async findConfig(id: string): Promise<Epiphan> {
-    return await this.epiphanRepository.findOne({
+    return this.epiphanRepository.findOne({
       where: {
         _id: new ObjectID(id),
       },
@@ -49,6 +49,7 @@ export class EpiphanService {
     return result.insertedId;
   }
   async stopEpiphanRecording(data: StopEpiphanRecordingDto): Promise<boolean> {
+    // TODO: This must be reimplemented, dosnt need Promise<boolean> anymore since this is an event...
     const epiphanConfig = await this.findConfig(data.id);
 
     if (!epiphanConfig) {
@@ -87,7 +88,6 @@ export class EpiphanService {
         retryPolicy(),
         handleAxiosExceptions(),
       ));
-      // TODO: Ingest into opencast...
       return response && response.status == "ok";
     } catch (e) {
       this.logger.error(`Error while starting Epiphan: ${e}`);

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { LIVEKIT_EGRESS_SERVICE, MediaType, OPENCAST_ADD_MEDIA } from "../../app.constants";
+import { LIVEKIT_EGRESS_SERVICE, OPENCAST_ADD_MEDIA } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { EgressClient, EncodedFileType, EncodingOptionsPreset } from "livekit-server-sdk";
 import { ConfigService } from "@nestjs/config";
@@ -11,6 +11,7 @@ import { EgressStatus } from "livekit-server-sdk/dist/proto/livekit_egress";
 import { LivekitTaskService } from "./livekit.task.service";
 import { StopEgressRecordingDto } from "../dto/StopEgressRecordingDto";
 import { AddMediaDto } from "../../opencast/dto/AddMediaDto";
+import { MediaType } from "../dto/enums/MediaType";
 
 @Injectable()
 export class LivekitEgressService {

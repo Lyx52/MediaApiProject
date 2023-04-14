@@ -25,6 +25,7 @@ import { CreateOpencastEventDto } from "../../opencast/dto/CreateOpencastEventDt
 import { PlugNMeetHttpService } from "./plugnmeet.http.service";
 import { StartOpencastIngestDto } from "../../opencast/dto/StartOpencastIngestDto";
 import { randomStringGenerator } from "@nestjs/common/utils/random-string-generator.util";
+import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
 @Injectable()
 export class PlugNMeetService {
   private readonly logger = new Logger(PlugNMeetService.name);
@@ -144,7 +145,11 @@ export class PlugNMeetService {
       await this.recorderRepository.save(recorder, );
       this.taskService.deleteRecorderPing(recorder.recorderId);
 
-      this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{});
+      this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{
+        name: `RoomTest-${payload.roomSid}`,
+        roomSid: payload.roomSid,
+        recorderId: recorder.recorderId
+      });
       await this.httpService.sendStartedMessage(payload, recorder.recorderId);
       return;
     }
@@ -160,7 +165,7 @@ export class PlugNMeetService {
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
       });
-      this.client.emit(STOP_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{});
+      this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{});
 
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);
@@ -170,7 +175,10 @@ export class PlugNMeetService {
       await this.httpService.sendCompletedMessage(payload, recorder.recorderId);
 
       // Notify opencast that event is finished and can start ingesting
-      this.client.emit(START_OPENCAST_INGEST, <StartOpencastIngestDto>{});
+      this.client.emit(START_OPENCAST_INGEST, <StartOpencastIngestDto>{
+        recorderId: recorder.recorderId,
+        roomSid: recorder.roomSid
+      });
       return;
     }
     this.logger.error(`Recorder dosn't exist for room ${payload.roomSid}!`);

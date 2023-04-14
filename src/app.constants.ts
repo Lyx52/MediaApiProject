@@ -18,7 +18,4 @@ export const OPENCAST_ADD_MEDIA = { cmd: "addToOpencastQueue" }
 
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';
 
-export enum MediaType {
-  EPIPHAN_MEDIA,
-  EGRESS_MEDIA
-}
+export const MAX_INGEST_WAIT_ATTEMPTS = 100;
