@@ -18,13 +18,16 @@ import { OpencastEvent } from "./opencast/entities/opencast.event";
       port: 27017,
       entities: [Epiphan, Recorder, EgressSession, OpencastEvent],
       synchronize: true,
-      useUnifiedTopology: true,
+      useUnifiedTopology: true
     }),
+
     BullModule.forRoot({
       redis: {
         host: '85.254.205.116',
         port: 6379,
       },
+
+
     }),
     EpiphanModule, PlugNMeetModule, LivekitModule, OpencastModule
   ],

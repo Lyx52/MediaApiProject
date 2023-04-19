@@ -23,6 +23,7 @@ import { HttpModule } from "@nestjs/axios";
       timeout: 5000,
       maxRedirects: 5,
     }),
+
   ],
   providers: [LivekitIngressService, LivekitEgressService, LivekitTaskService],
   controllers: [LivekitController],

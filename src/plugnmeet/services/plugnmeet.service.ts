@@ -130,7 +130,7 @@ export class PlugNMeetService {
       {
         // Cannot start epiphan recording
         this.logger.error('Failed to start epiphan recording!');
-        this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+        await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
           recorderId: recorder.recorderId,
           roomSid:  recorder.roomSid,
         });
@@ -145,8 +145,8 @@ export class PlugNMeetService {
       await this.recorderRepository.save(recorder, );
       this.taskService.deleteRecorderPing(recorder.recorderId);
 
-      this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{
-        name: `RoomTest-${payload.roomSid}`,
+      await this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{
+        name: `RoomTest-${payload.roomSid}_${new Date().getMilliseconds()}`,
         roomSid: payload.roomSid,
         recorderId: recorder.recorderId
       });
@@ -161,11 +161,11 @@ export class PlugNMeetService {
 
     if (recorder) {
       // Emit events to stop recordings...
-      this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+      await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
       });
-      this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{});
+      await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{});
 
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);
@@ -175,7 +175,7 @@ export class PlugNMeetService {
       await this.httpService.sendCompletedMessage(payload, recorder.recorderId);
 
       // Notify opencast that event is finished and can start ingesting
-      this.client.emit(START_OPENCAST_INGEST, <StartOpencastIngestDto>{
+      await this.client.emit(START_OPENCAST_INGEST, <StartOpencastIngestDto>{
         recorderId: recorder.recorderId,
         roomSid: recorder.roomSid
       });

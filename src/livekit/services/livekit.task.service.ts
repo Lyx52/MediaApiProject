@@ -2,13 +2,13 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, SchedulerRegistry } from "@nestjs/schedule";
 import Redis from "ioredis";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
-import { CronJob } from "cron";
 import { EgressClient } from "livekit-server-sdk";
 import { ConfigService } from "@nestjs/config";
 import { EgressStatus } from "livekit-server-sdk/dist/proto/livekit_egress";
 import { InjectRepository } from "@nestjs/typeorm";
 import { EgressSession } from "../entities/EgressSession";
 import { MongoRepository } from "typeorm";
+
 @Injectable()
 export class LivekitTaskService {
   private readonly logger = new Logger(LivekitTaskService.name);
@@ -33,7 +33,8 @@ export class LivekitTaskService {
     for (const session of sessions) {
       const livekitSession = livekitSessions.find((el) => el.egressId == session.egressId);
       // Synchronize egress status
-      session.status = livekitSession.status;
+      session.status = livekitSession?.status || EgressStatus.EGRESS_COMPLETE;
+
       await this.egressSessionRepository.save(session);
     }
     // TODO: Implement a way to delete entries out of redis egress:room:room* -> egressId

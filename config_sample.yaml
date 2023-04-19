@@ -1,9 +1,8 @@
 appconfig:
   max_retries: 5
   max_recorders: 2
-  ingress_capture: false
-  epiphan_capture: false
   port: 9999
+  recording_location: './recording_files'
 plugnmeet:
   host: PLUG_N_MEET_SERVER_DOMAIN
   key: PLUG_N_MEET_API_KEY

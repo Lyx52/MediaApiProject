@@ -17,7 +17,9 @@ export class PlugNMeetTaskService {
   ) {
   }
   addRecorderPing(recorderId: string) {
-    this.schedulerRegistry.addInterval(`${recorderId}_PING`, setInterval(async () => await this.sendPing(recorderId), 5000));
+    if (!this.schedulerRegistry.doesExist("interval", `${recorderId}_PING`)) {
+      this.schedulerRegistry.addInterval(`${recorderId}_PING`, setInterval(async () => await this.sendPing(recorderId), 5000));
+    }
     this.logger.debug(`${recorderId}_PING added to scheduler`);
   }
   deleteRecorderPing(recorderId: string) {

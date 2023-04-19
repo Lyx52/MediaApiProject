@@ -20,15 +20,20 @@ import {
 } from "rxjs";
 import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../common/utils/axios.utils";
 import { StopEpiphanRecordingDto } from "../dto/StopEpiphanRecordingDto";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
+  private readonly recordingLocation: string;
   constructor(
     @InjectRepository(Epiphan)
     private readonly epiphanRepository: MongoRepository<Epiphan>,
-    private readonly httpService: HttpService
-  ) {}
+    private readonly httpService: HttpService,
+    private readonly config: ConfigService,
+  ) {
+    this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
+  }
 
   async findAll(): Promise<Epiphan[]> {
     return this.findAllSelectFields(['id', 'name', 'host']);
@@ -65,6 +70,7 @@ export class EpiphanService {
         retryPolicy(),
         handleAxiosExceptions(),
       ));
+
       // TODO: Ingest into opencast...
       return response && response.status == "ok";
     } catch (e) {

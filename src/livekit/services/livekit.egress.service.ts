@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { LIVEKIT_EGRESS_SERVICE, OPENCAST_ADD_MEDIA } from "../../app.constants";
+import { ADD_OPENCAST_INGEST_JOB, LIVEKIT_EGRESS_SERVICE } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { EgressClient, EncodedFileType, EncodingOptionsPreset } from "livekit-server-sdk";
 import { ConfigService } from "@nestjs/config";
@@ -10,8 +10,8 @@ import { StartEgressRecordingDto } from "../dto/StartEgressRecordingDto";
 import { EgressStatus } from "livekit-server-sdk/dist/proto/livekit_egress";
 import { LivekitTaskService } from "./livekit.task.service";
 import { StopEgressRecordingDto } from "../dto/StopEgressRecordingDto";
-import { AddMediaDto } from "../../opencast/dto/AddMediaDto";
 import { MediaType } from "../dto/enums/MediaType";
+import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
 
 @Injectable()
 export class LivekitEgressService {
@@ -34,9 +34,10 @@ export class LivekitEgressService {
       const info = await this.egressClient.stopEgress(session.egressId);
       const files = info.fileResults;
       if (files) {
+        files.push(files[0]);
         // Add each file to opencast queue
         for (const file of files) {
-          this.client.emit(OPENCAST_ADD_MEDIA, <AddMediaDto>{
+          await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
             recorderId: data.recorderId,
             roomSid: data.roomSid,
             uri: file.filename,

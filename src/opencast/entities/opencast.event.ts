@@ -1,6 +1,7 @@
 import { Column, Entity, ObjectID, ObjectIdColumn } from 'typeorm';
 import { CaptureAgentState } from "../dto/enums/CaptureAgentState";
 import { OpencastRecordingState } from "../dto/enums/OpencastRecordingState";
+import { IngestJobDto } from "../dto/IngestJobDto";
 
 @Entity()
 export class OpencastEvent {

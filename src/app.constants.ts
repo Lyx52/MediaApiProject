@@ -6,6 +6,7 @@ export const LIVEKIT_EGRESS_SERVICE = 'LIVEKIT_EGRESS_SERVICE';
 
 // Redis keys
 export const PLUGNMEET_RECORDER_INFO_KEY = 'pnm:recorders';
+export const EVENT_MEDIAPACKAGE_RESOURCE_KEY = "event:mediapackages";
 
 // Microservice command patterns
 export const START_LIVEKIT_EGRESS_RECORDING = { cmd: "startLivekitEgressRecording" }
@@ -14,8 +15,14 @@ export const STOP_LIVEKIT_EGRESS_RECORDING = { cmd: "stopLivekitEgressRecording"
 export const STOP_EPIPHAN_RECORDING = { cmd: "stopEpiphanRecording" }
 export const CREATE_OPENCAST_EVENT = { cmd: "createOpencastEvent" }
 export const START_OPENCAST_INGEST = { cmd: "startOpencastIngest" }
-export const OPENCAST_ADD_MEDIA = { cmd: "addToOpencastQueue" }
+export const ADD_OPENCAST_INGEST_JOB = { cmd: "addOpencastIngestJob" }
+export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
 
+// Job patterns
+export const INGEST_SINGLE_VIDEO_JOB = 'INGEST_SINGLE_VIDEO_JOB';
+export const INGEST_MEDIAPACKAGE_JOB = 'INGEST_MEDIAPACKAGE_JOB';
+
+// Other constants
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';
-
-export const MAX_INGEST_WAIT_ATTEMPTS = 100;
+export const INGEST_JOB_RETRY = 3000;
+export const MEDIAPACKAGE_LOCK_TTL = 30_000;

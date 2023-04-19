@@ -7,10 +7,13 @@ import { handleAxiosExceptions, retryPolicy } from "../../common/utils/axios.uti
 import { CaptureAgentState } from "../dto/enums/CaptureAgentState";
 import { OpencastRecordingState } from "../dto/enums/OpencastRecordingState";
 import { InjectRepository } from "@nestjs/typeorm";
-import { MongoRepository } from "typeorm";
+import { FindOneAndReplaceOption, MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
 import { OpencastEvent } from "../entities/opencast.event";
 import { StartOpencastIngestDto } from "../dto/StartOpencastIngestDto";
+import { IngestJobDto } from "../dto/IngestJobDto";
+import * as fs from 'fs/promises';
+import { basename } from "path";
 @Injectable()
 export class OpencastEventService {
   private readonly logger: Logger = new Logger(OpencastEventService.name);
@@ -26,17 +29,48 @@ export class OpencastEventService {
     this.password = this.config.getOrThrow<string>("opencast.password");
     this.username = this.config.getOrThrow<string>("opencast.username");
   }
-  async findEvent(id: string): Promise<OpencastEvent> {
+  async findEventById(id: string) {
+    return this.findEvent({ id: ObjectID(id) });
+  }
+  async findEvent(whereStr: object): Promise<OpencastEvent> {
     return this.eventRepository.findOne({
-      where: {
-        _id: new ObjectID(id),
-      },
-      select: ['id', 'name', "agentState", "recorderId", "recordingState", "agentState", "roomSid"],
+      where: whereStr,
+      select: ['id', 'name', "agentState", "recorderId", "recordingState", "agentState", "roomSid", "eventId"],
     });
   }
   async createMediaPackage() {
     const headers = this.makeAuthHeader();
     return firstValueFrom(this.httpService.get(`${this.host}/ingest/createMediaPackage`, {
+      headers: headers
+    }).pipe(
+      map((response) => response.data.toString()),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
+  async ingestRecordings(mediaPackage: string, eventId: string) {
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
+    const params = new URLSearchParams();
+    params.set('mediaPackage', mediaPackage);
+    params.set('workflowDefinitionId', 'schedule-and-upload');
+    params.set('workflowInstanceId', eventId);
+    return firstValueFrom(this.httpService.post(`${this.host}/ingest/ingest`, {}, {
+      headers: headers,
+      params: params
+    }).pipe(
+      map((response) => response.data.toString()),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
+  async addTrackFileFromFs(mediaPackage: string, uri: string) {
+    const videoFile = await fs.readFile(uri);
+    const data = new FormData();
+    data.append('mediaPackage', mediaPackage);
+    data.append('flavor', 'presenter/source');
+    data.append('BODY1', new Blob([videoFile]), basename(uri));
+    const headers = this.makeAuthHeader('multipart/form-data');
+    return firstValueFrom(this.httpService.post(`${this.host}/ingest/addTrack`, data, {
       headers: headers
     }).pipe(
       map((response) => response.data.toString()),
@@ -56,7 +90,7 @@ export class OpencastEventService {
       `  <dcterms:created xsi:type="dcterms:W3CDTF">${event.start.toISOString()}</dcterms:created>\n` +
       `  <dcterms:temporal xsi:type="dcterms:Period">start=${event.start.toISOString()}; end=${event.end.toISOString()}; scheme=W3C-DTF;</dcterms:temporal>\n` +
       `  <dcterms:language>Latvian</dcterms:language>\n` +
-      `  <dcterms:spatial>${event.recorderId}</dcterms:spatial>\n` +
+      `  <dcterms:spatial>${event.recorderId}_${event.roomSid}_${event.name}</dcterms:spatial>\n` +
       `  <dcterms:title>${event.start.toLocaleDateString(
         'lv-LV',
       )} ${event.name} recording</dcterms:title>\n` +
@@ -84,7 +118,7 @@ export class OpencastEventService {
     const params = new URLSearchParams();
     params.set('state', CaptureAgentState[state].toString().toLowerCase());
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
-    await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${event.recorderId}`, {},{
+    await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${event.recorderId}_${event.roomSid}_${event.name}`, {},{
       headers: headers,
       params: params
     }).pipe(
@@ -114,7 +148,7 @@ export class OpencastEventService {
     const params = new URLSearchParams();
     params.set('start', event.start.getTime().toString());
     params.set('end', event.end.getTime().toString());
-    params.set('agent', event.recorderId);
+    params.set('agent', `${event.recorderId}_${event.roomSid}_${event.name}`);
     params.set('mediaPackage', mediaPackage);
     params.set('users', 'admin');
     params.set('source', event.name);
@@ -127,7 +161,7 @@ export class OpencastEventService {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    const createdEvent: any = await this.getLastRecording(event.recorderId);
+    const createdEvent: any = await this.getLastRecording(`${event.recorderId}_${event.roomSid}_${event.name}`);
     event.eventId = createdEvent.id;
     return event;
   }
@@ -223,11 +257,11 @@ export class OpencastEventService {
       handleAxiosExceptions(),
     ));
   };
-  async createAndStartRecordingEvent(data: CreateOpencastEventDto) {
+  async startRecordingEvent(data: CreateOpencastEventDto) {
     try {
       // Remove old stopped recordings
       await this.removeOldScheduledRecordings();
-      let event = await this.createEvent(data);
+      let event = await this.createOrGetEvent(data);
       event = await this.setCaptureAgentState(event, CaptureAgentState.CAPTURING);
       event = await this.setRecordingEventState(event, OpencastRecordingState.CAPTURING);
       await this.eventRepository.save(event);
@@ -236,7 +270,7 @@ export class OpencastEventService {
     }
     // TODO: Maybe add some retry policy?
   };
-  async stopEventAndStartIngesting(data: StartOpencastIngestDto) {
+  async stopRecordingEvent(data: StartOpencastIngestDto): Promise<OpencastEvent> {
     let event = await this.eventRepository.findOne({
       where: { roomSid: data.roomSid, recorderId: data.recorderId },
       order: { start: 'DESC' }
@@ -247,29 +281,45 @@ export class OpencastEventService {
       return;
     }
     try {
-      // Set event state, indicating that ingesting queue can start ingesting videos.
+      /**
+       * Set event state, indicating that ingesting queue can start ingesting videos.
+       */
       event = await this.setRecordingEventState(event, OpencastRecordingState.CAPTURE_FINISHED);
       event = await this.setCaptureAgentState(event, CaptureAgentState.IDLE);
-      event = await this.setRecordingEventState(event, OpencastRecordingState.UPLOAD_FINISHED);
+      event = await this.setRecordingEventState(event, OpencastRecordingState.UPLOADING);
       // TODO: Update end time in opencast event aswell, thisway we can try to avoid scheduling conflicts
       // Set end time as now
       event.end = new Date();
       await this.eventRepository.save(event);
+      return event;
     } catch (e) {
       this.logger.error(`Caught exception while stopping event: ${e}!`);
     }
   }
-  async createEvent(data: CreateOpencastEventDto): Promise<OpencastEvent> {
+  async createOrGetEvent(data: CreateOpencastEventDto): Promise<OpencastEvent> {
     /**
-     * Create event entity
+     *  First we try to see if event exists AND if it already has eventId
      */
-    let event = this.eventRepository.create();
+    let event = await this.eventRepository.findOne({
+      where: {
+        recorderId: data.recorderId,
+        roomSid: data.roomSid,
+        eventId: {
+          $ne: null,
+          $exists: true
+        }
+      }
+    });
+    if (event) return event;
+    /**
+     * Create event entity, it must be created everytime, because opencast events cannot be started/stopped
+     */
+    event = this.eventRepository.create();
     event.recorderId = data.recorderId;
     event.name = data.name;
     event.roomSid = data.roomSid;
     event.start = new Date();
     event.end = new Date();
-
     // End of recording is in one hour
     // TODO: Change this to one hour currently 60 sec
     event.end.setTime(event.start.getTime() + 60000);
@@ -284,10 +334,9 @@ export class OpencastEventService {
     let mediaPackage = await this.createMediaPackage();
     mediaPackage = await this.addDublinCore(event, <string>mediaPackage);
     /**
-     * Create recording
+     * Create recording, if not already created
      */
     event = await this.createRecordingEvent(event, <string>mediaPackage);
-
     /**
      *  Configure event
      */
