@@ -7,6 +7,7 @@ import { StartEpiphanRecordingDto } from "./dto/StartEpiphanRecordingDto";
 import { START_EPIPHAN_RECORDING, STOP_EPIPHAN_RECORDING } from "../app.constants";
 import { Observable, of } from "rxjs";
 import { StopEpiphanRecordingDto } from "./dto/StopEpiphanRecordingDto";
+import { GetEpiphanRecordingsDto } from "./dto/GetEpiphanRecordingsDto";
 @Controller('epiphan')
 export class EpiphanController {
   private readonly logger: Logger = new Logger(EpiphanController.name);
@@ -36,6 +37,11 @@ export class EpiphanController {
     return;
     this.logger.debug("STOP_EPIPHAN_RECORDING");
     await this.epiphanService.stopEpiphanRecording(<StopEpiphanRecordingDto>{
+      channel: 1,
+      roomSid: "",
+      id: "643804a61caa577b141bfe2f"
+    });
+    await this.epiphanService.downloadLastRecording(<GetEpiphanRecordingsDto>{
       channel: 1,
       roomSid: "",
       id: "643804a61caa577b141bfe2f"

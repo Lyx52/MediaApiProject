@@ -17,6 +17,7 @@ import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
 export class LivekitEgressService {
   private readonly logger = new Logger(LivekitEgressService.name);
   private readonly egressClient: EgressClient;
+  private readonly recordingLocation: string;
   constructor(
     @Inject(LIVEKIT_EGRESS_SERVICE) private readonly client: ClientProxy,
     @InjectRepository(EgressSession) private readonly egressSessionRepository: MongoRepository<EgressSession>,
@@ -28,6 +29,7 @@ export class LivekitEgressService {
       this.config.getOrThrow<string>("livekit.key"),
       this.config.getOrThrow<string>("livekit.secret"),
     );
+    this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
   }
   async stopEgressOrRetry(data: StopEgressRecordingDto, session: EgressSession, retries= 0) {
     try {
@@ -80,7 +82,7 @@ export class LivekitEgressService {
         data.roomId,
         {
           fileType: EncodedFileType.MP4,
-          filepath: '/app/recording_files/{room_id}_{room_name}-{time}.mp4',
+          filepath: `${this.recordingLocation}{room_id}_{room_name}-{time}.mp4`,
         },
         {
           encodingOptions: EncodingOptionsPreset.H264_1080P_60,

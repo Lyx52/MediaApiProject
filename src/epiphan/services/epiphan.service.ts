@@ -21,6 +21,7 @@ import {
 import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../common/utils/axios.utils";
 import { StopEpiphanRecordingDto } from "../dto/StopEpiphanRecordingDto";
 import { ConfigService } from "@nestjs/config";
+import { GetEpiphanRecordingsDto } from "../dto/GetEpiphanRecordingsDto";
 
 @Injectable()
 export class EpiphanService {
@@ -70,13 +71,56 @@ export class EpiphanService {
         retryPolicy(),
         handleAxiosExceptions(),
       ));
-
       // TODO: Ingest into opencast...
       return response && response.status == "ok";
     } catch (e) {
       this.logger.error(`Error while starting Epiphan: ${e}`);
       return false;
     }
+  }
+  async getEpiphanRecordings(data: GetEpiphanRecordingsDto) {
+    const epiphanConfig = await this.findConfig(data.id);
+
+    if (!epiphanConfig) {
+      this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
+      return false;
+    }
+    try {
+      const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
+      return  await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${data.channel}/archive/files`, {
+        headers: headers
+      }).pipe(
+        map((response) => response.data),
+        retryPolicy(),
+        handleAxiosExceptions(),
+      ));
+    } catch (e) {
+      this.logger.error(`Error while getting Epiphan recordings: ${e}`);
+      return false;
+    }
+  };
+  async getLastEpiphanRecording(data: GetEpiphanRecordingsDto) {
+    const response = await this.getEpiphanRecordings(data);
+    if (response) {
+      const files: Array<any> = response['result'];
+      const lastEventStart = Math.max(
+        ...files.map((file) => Date.parse(file.created)),
+      );
+      return isNaN(lastEventStart)
+        ? null
+        : files.filter((file) => Date.parse(file.created) == lastEventStart);
+    }
+  };
+  async getLastEpiphanRecordingNew(data) {
+    const response: any = await this.getEpiphanRecordings(data);
+    if (!response) return null;
+    const files = response.result;
+    const lastFile = files.reduce((prev, curr) => Date.parse(curr.created) > Date.parse(prev.created) ? curr : prev);
+    return lastFile;
+  };
+  async downloadLastRecording(data: GetEpiphanRecordingsDto) {
+    const recording = this.getLastEpiphanRecording(data);
+    // TODO: Implement download functionality
   }
   async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<boolean> {
     const epiphanConfig = await this.findConfig(data.id);
