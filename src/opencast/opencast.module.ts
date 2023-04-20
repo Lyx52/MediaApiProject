@@ -9,7 +9,7 @@ import { ConfigModule } from "@nestjs/config";
 import config from "../common/utils/config.yaml";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { OpencastEvent } from "./entities/opencast.event";
-import { OpencastVideoIngestConsumer } from "./processors/opencast.ingest-queue.processor";
+import { OpencastVideoIngestConsumer } from "./processors/opencast.ingest.processor";
 import { RedisModule } from "@liaoliaots/nestjs-redis";
 @Module({
   imports: [

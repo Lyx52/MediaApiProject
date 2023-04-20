@@ -1,28 +1,21 @@
-import { Injectable, Logger, NotFoundException, UseInterceptors } from "@nestjs/common";
-import { handleRetry, InjectRepository } from "@nestjs/typeorm";
-import { AxiosResponse, AxiosError } from 'axios';
-import { FindOptionsSelect, MongoRepository } from "typeorm";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
 import { Epiphan } from "../epiphan.entity";
 import { CreateEpiphanDto } from "../dto/CreateEpiphanDto";
 import { HttpService } from "@nestjs/axios";
 import { StartEpiphanRecordingDto } from "../dto/StartEpiphanRecordingDto";
-import {
-  catchError,
-  delay,
-  delayWhen,
-  map,
-  Observable,
-  throwError,
-  timer,
-  firstValueFrom,
-  retry, filter, of, mergeWith, pipe
-} from "rxjs";
+import { firstValueFrom, map } from "rxjs";
 import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../common/utils/axios.utils";
 import { StopEpiphanRecordingDto } from "../dto/StopEpiphanRecordingDto";
 import { ConfigService } from "@nestjs/config";
 import { GetEpiphanRecordingsDto } from "../dto/GetEpiphanRecordingsDto";
-
+import { createWriteStream, existsSync, mkdirSync, renameSync } from 'fs';
+import { ADD_OPENCAST_INGEST_JOB, EPIPHAN_SERVICE } from "../../app.constants";
+import { ClientProxy } from "@nestjs/microservices";
+import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
+import * as path from "path";
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
@@ -32,6 +25,7 @@ export class EpiphanService {
     private readonly epiphanRepository: MongoRepository<Epiphan>,
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
+    @Inject(EPIPHAN_SERVICE) private readonly client: ClientProxy
   ) {
     this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
   }
@@ -42,12 +36,12 @@ export class EpiphanService {
   async findAllSelectFields(fields): Promise<Epiphan[]> {
     return this.epiphanRepository.find({select: fields});
   }
-  async findConfig(id: string): Promise<Epiphan> {
+  async findConfig(epiphanId: string): Promise<Epiphan> {
     return this.epiphanRepository.findOne({
       where: {
-        _id: new ObjectID(id),
+        epiphanId: epiphanId
       },
-      select: ['id', 'name', 'host', 'password', 'username'],
+      select: ['id', 'epiphanId', 'host', 'password', 'username'],
     });
   }
   async addConfig(entity: CreateEpiphanDto): Promise<ObjectID> {
@@ -55,16 +49,15 @@ export class EpiphanService {
     return result.insertedId;
   }
   async stopEpiphanRecording(data: StopEpiphanRecordingDto): Promise<boolean> {
-    // TODO: This must be reimplemented, dosnt need Promise<boolean> anymore since this is an event...
-    const epiphanConfig = await this.findConfig(data.id);
+    const epiphanConfig = await this.findConfig(data.epiphanId);
 
     if (!epiphanConfig) {
-      this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
+      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
       return false;
     }
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}api/recorders/${data.channel}/control/stop`, {}, {
+      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/control/stop`, {}, {
         headers: headers
       }).pipe(
         map((response) => response.data),
@@ -79,15 +72,15 @@ export class EpiphanService {
     }
   }
   async getEpiphanRecordings(data: GetEpiphanRecordingsDto) {
-    const epiphanConfig = await this.findConfig(data.id);
+    const epiphanConfig = await this.findConfig(data.epiphanId);
 
     if (!epiphanConfig) {
-      this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
+      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
       return false;
     }
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-      return  await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${data.channel}/archive/files`, {
+      return  await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/archive/files`, {
         headers: headers
       }).pipe(
         map((response) => response.data),
@@ -99,39 +92,67 @@ export class EpiphanService {
       return false;
     }
   };
-  async getLastEpiphanRecording(data: GetEpiphanRecordingsDto) {
-    const response = await this.getEpiphanRecordings(data);
-    if (response) {
-      const files: Array<any> = response['result'];
-      const lastEventStart = Math.max(
-        ...files.map((file) => Date.parse(file.created)),
-      );
-      return isNaN(lastEventStart)
-        ? null
-        : files.filter((file) => Date.parse(file.created) == lastEventStart);
-    }
-  };
-  async getLastEpiphanRecordingNew(data) {
+  async getLastEpiphanRecording(data) {
     const response: any = await this.getEpiphanRecordings(data);
     if (!response) return null;
     const files = response.result;
-    const lastFile = files.reduce((prev, curr) => Date.parse(curr.created) > Date.parse(prev.created) ? curr : prev);
-    return lastFile;
+    return files.reduce((prev, curr) => Date.parse(curr.created) > Date.parse(prev.created) ? curr : prev);
   };
-  async downloadLastRecording(data: GetEpiphanRecordingsDto) {
-    const recording = this.getLastEpiphanRecording(data);
-    // TODO: Implement download functionality
-  }
-  async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<boolean> {
-    const epiphanConfig = await this.findConfig(data.id);
+  async downloadLastRecording(data: StopEpiphanRecordingDto) {
+    const epiphanConfig = await this.findConfig(data.epiphanId);
 
     if (!epiphanConfig) {
-      this.logger.error(`Epiphan configuration with id ${data.id} not found!`)
+      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
+      return false;
+    }
+    const recording: any = await this.getLastEpiphanRecording(<GetEpiphanRecordingsDto>data);
+    // TODO: Implement download functionality
+    if (recording.id) {
+      try {
+        const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
+        if (!existsSync(this.recordingLocation)){
+          mkdirSync(this.recordingLocation);
+        }
+        const downloadLocation = path.join(this.recordingLocation, recording.id);
+        const uploadLocation = path.join(this.recordingLocation, `${recording.name}.mp4`)
+        await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/archive/files/${recording.id}`, {
+          headers: headers,
+          responseType: "stream"
+        }).pipe(
+          map(async(response) => {
+            const writer = createWriteStream(downloadLocation);
+            await response.data.pipe(writer);
+            await writer.on('error', (err) => {
+              this.logger.error(`Error while downloading epiphan file: ${err}`);
+            });
+            await writer.on('finish', async () => {
+              renameSync(downloadLocation, uploadLocation);
+              this.logger.log(`File downloaded successfully to ${uploadLocation}`);
+              await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
+                recorderId: data.recorderId,
+                roomSid: data.roomSid,
+                uri: uploadLocation,
+              });
+            });
+          }),
+          retryPolicy(),
+          handleAxiosExceptions(),
+        ));
+      } catch (e) {
+        this.logger.error(`Error while downloading epiphan file: ${e}`);
+      }
+    }
+  }
+  async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<boolean> {
+    const epiphanConfig = await this.findConfig(data.epiphanId);
+
+    if (!epiphanConfig) {
+      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
       return false;
     }
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}api/recorders/${data.channel}/control/start`, {}, {
+      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/control/start`, {}, {
         headers: headers
       }).pipe(
         map((response) => response.data),

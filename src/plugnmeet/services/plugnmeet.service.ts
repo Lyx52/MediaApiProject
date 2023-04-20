@@ -126,7 +126,11 @@ export class PlugNMeetService {
       }
 
       // Start epiphan recording
-      if (!await firstValueFrom(this.client.send<boolean>(START_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{})))
+      if (!await firstValueFrom(this.client.send<boolean>(START_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{
+        recorderId: recorder.recorderId,
+        roomSid:  recorder.roomSid,
+        epiphanId: "LBTUEpiphanTest1"
+      })))
       {
         // Cannot start epiphan recording
         this.logger.error('Failed to start epiphan recording!');
@@ -158,14 +162,19 @@ export class PlugNMeetService {
   }
   async stopRecording(payload: PlugNMeetToRecorder) {
     const recorder = await this.recorderRepository.findOne({ where: { roomSid: payload.roomSid } })
-
     if (recorder) {
+      // Dont need to stop recording, its already been stopped
+      if (!recorder.isRecording) return;
       // Emit events to stop recordings...
       await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
       });
-      await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{});
+      await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
+        recorderId: recorder.recorderId,
+        roomSid:  recorder.roomSid,
+        epiphanId: "LBTUEpiphanTest1"
+      });
 
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);

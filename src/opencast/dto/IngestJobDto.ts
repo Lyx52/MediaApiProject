@@ -11,7 +11,5 @@ export class IngestJobDto {
   @IsString()
   @IsNotEmpty()
   readonly uri: string;
-  @IsNotEmpty()
-  readonly type: MediaType;
 }
 

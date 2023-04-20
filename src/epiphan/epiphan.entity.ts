@@ -6,7 +6,7 @@ export class Epiphan {
   id: ObjectID;
 
   @Column()
-  name: string;
+  epiphanId: string;
 
   @Column()
   host: string;
@@ -16,4 +16,6 @@ export class Epiphan {
 
   @Column()
   password: string;
+  @Column()
+  defaultChannel: number;
 }

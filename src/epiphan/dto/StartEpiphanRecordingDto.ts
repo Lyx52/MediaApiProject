@@ -1,12 +1,13 @@
 import { IsIn, IsInt, IsNotEmpty, IsString } from "class-validator";
 
 export class StartEpiphanRecordingDto {
-  @IsInt()
-  readonly id: string;
-  @IsInt()
-  readonly channel: number;
-
+  @IsString()
+  @IsNotEmpty()
+  readonly recorderId: string;
   @IsString()
   @IsNotEmpty()
   readonly roomSid: string;
+  @IsString()
+  @IsNotEmpty()
+  readonly epiphanId: string;
 }

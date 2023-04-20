@@ -3,7 +3,7 @@ import { Job, JobStatus } from "bull";
 import { Logger } from "@nestjs/common";
 import {
   EVENT_MEDIAPACKAGE_RESOURCE_KEY, INGEST_JOB_RETRY, INGEST_MEDIAPACKAGE_JOB,
-  INGEST_SINGLE_VIDEO_JOB,
+  INGEST_VIDEO_JOB,
   MEDIAPACKAGE_LOCK_TTL,
   PLUGNMEET_RECORDER_INFO_KEY
 } from "../../app.constants";
@@ -17,6 +17,7 @@ import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import Redlock, { Lock as RLock } from "redlock";
 import { IngestMediaPackageDto } from "../dto/IngestMediaPackageDto";
+import { existsSync } from "fs";
 
 @Processor('video')
 export class OpencastVideoIngestConsumer {
@@ -89,8 +90,12 @@ export class OpencastVideoIngestConsumer {
       await job.moveToCompleted();
     }
   }
-  @Process(INGEST_SINGLE_VIDEO_JOB)
+  @Process(INGEST_VIDEO_JOB)
   async ingestVideoFile(job: Job<IngestJobDto>) {
+    if (!existsSync(job.data.uri)) {
+      await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!` });
+      return;
+    }
     const event = await this.eventRepository.findOne({
       where: {
         roomSid: job.data.roomSid,
@@ -135,20 +140,12 @@ export class OpencastVideoIngestConsumer {
        *  Determine where the file is located based on the device
        *  TODO: Might need to move downloading from epiphan to different job
        */
-      const fileLocation = "./sample-10s.mp4";
-      switch (job.data.type)
-      {
-        case MediaType.EGRESS_MEDIA:
-          break;
-        case MediaType.EPIPHAN_MEDIA:
-          break;
-      }
       /**
        *  We update the mediapackage on opencast side
        */
-      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, fileLocation);
+      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri);
       mediaPackageInfo.version += 1;
-      this.logger.debug(`Updating mediapackage for event ${event.eventId}, version ${mediaPackageInfo.version}, file ${job.data.uri}!`);
+      this.logger.debug(`Updating mediapackage for event ${event.eventId}, version ${mediaPackageInfo.version}, \nfile ${job.data.uri}!`);
       /**
        *  Then we update it from our side
        */

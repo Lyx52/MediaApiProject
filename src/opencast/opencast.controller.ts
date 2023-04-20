@@ -2,7 +2,7 @@ import { Body, Controller, Inject, Logger } from "@nestjs/common";
 import {
   ADD_OPENCAST_INGEST_JOB,
   CREATE_OPENCAST_EVENT, INGEST_MEDIAPACKAGE_JOB,
-  INGEST_SINGLE_VIDEO_JOB, PLUGNMEET_ROOM_ENDED,
+  INGEST_VIDEO_JOB, PLUGNMEET_ROOM_ENDED,
   START_OPENCAST_INGEST
 } from "../app.constants";
 import { ClientProxy, Ctx, EventPattern, MessagePattern, Payload, RedisContext } from "@nestjs/microservices";
@@ -33,11 +33,12 @@ export class OpencastController {
   }
   @EventPattern(ADD_OPENCAST_INGEST_JOB)
   async addMediaToQueue(@Body() data: IngestJobDto) {
-    this.logger.debug("OPENCAST_ADD_MEDIA");
-    await this.ingestQueue.add(INGEST_SINGLE_VIDEO_JOB, data);
+    this.logger.debug("ADD_OPENCAST_INGEST_JOB");
+    await this.ingestQueue.add(INGEST_VIDEO_JOB, data);
   }
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {
+    this.logger.debug("PLUGNMEET_ROOM_ENDED");
     await this.ingestQueue.add(INGEST_MEDIAPACKAGE_JOB, <IngestMediaPackageDto>data);
   }
 }

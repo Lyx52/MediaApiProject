@@ -1,3 +1,4 @@
+// Microservice client names
 export const EPIPHAN_SERVICE = 'EPIPHAN_SERVICE';
 export const PLUGNMEET_SERVICE = 'PLUGNMEET_SERVICE';
 export const OPENCAST_SERVICE = 'OPENCAST_SERVICE';
@@ -19,7 +20,7 @@ export const ADD_OPENCAST_INGEST_JOB = { cmd: "addOpencastIngestJob" }
 export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
 
 // Job patterns
-export const INGEST_SINGLE_VIDEO_JOB = 'INGEST_SINGLE_VIDEO_JOB';
+export const INGEST_VIDEO_JOB = 'INGEST_VIDEO_JOB';
 export const INGEST_MEDIAPACKAGE_JOB = 'INGEST_MEDIAPACKAGE_JOB';
 
 // Other constants

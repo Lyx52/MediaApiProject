@@ -12,6 +12,7 @@ import { LivekitTaskService } from "./livekit.task.service";
 import { StopEgressRecordingDto } from "../dto/StopEgressRecordingDto";
 import { MediaType } from "../dto/enums/MediaType";
 import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
+import { existsSync } from "fs";
 
 @Injectable()
 export class LivekitEgressService {
@@ -36,14 +37,14 @@ export class LivekitEgressService {
       const info = await this.egressClient.stopEgress(session.egressId);
       const files = info.fileResults;
       if (files) {
-        files.push(files[0]);
         // Add each file to opencast queue
         for (const file of files) {
+          // if (!existsSync(`${this.recordingLocation}/${file.filename}`)) continue;
           await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
             recorderId: data.recorderId,
             roomSid: data.roomSid,
-            uri: file.filename,
-            type: MediaType.EPIPHAN_MEDIA
+            //uri: `${this.recordingLocation}/${file.filename}`,
+            uri: './sample-10s.mp4'
           });
         }
       }
@@ -82,7 +83,7 @@ export class LivekitEgressService {
         data.roomId,
         {
           fileType: EncodedFileType.MP4,
-          filepath: `${this.recordingLocation}{room_id}_{room_name}-{time}.mp4`,
+          filepath: `${this.recordingLocation}/{room_id}_{room_name}-{time}.mp4`,
         },
         {
           encodingOptions: EncodingOptionsPreset.H264_1080P_60,
