@@ -26,6 +26,7 @@ import { PlugNMeetHttpService } from "./plugnmeet.http.service";
 import { StartOpencastIngestDto } from "../../opencast/dto/StartOpencastIngestDto";
 import { randomStringGenerator } from "@nestjs/common/utils/random-string-generator.util";
 import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
+import { ConferenceSession } from "../entities/ConferenceSession";
 @Injectable()
 export class PlugNMeetService {
   private readonly logger = new Logger(PlugNMeetService.name);
@@ -33,6 +34,7 @@ export class PlugNMeetService {
 
   constructor(
     @InjectRepository(Recorder) private readonly recorderRepository: MongoRepository<Recorder>,
+    @InjectRepository(ConferenceSession) private readonly conferenceRepository: MongoRepository<ConferenceSession>,
     @InjectRedis() private readonly redisClient: Redis,
     private readonly taskService: PlugNMeetTaskService,
     private readonly httpService: PlugNMeetHttpService,
@@ -111,7 +113,8 @@ export class PlugNMeetService {
   }
 
   async startRecording(payload: PlugNMeetToRecorder) {
-    const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } })
+    const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } });
+    let conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
     if (recorder) {
       // Start livekit egress recording
       if (!await firstValueFrom(this.client.send<boolean>(START_LIVEKIT_EGRESS_RECORDING, <StartEgressRecordingDto>{
@@ -146,7 +149,15 @@ export class PlugNMeetService {
       recorder.isRecording = true;
       recorder.roomSid = payload.roomSid;
       recorder.roomId = payload.roomId;
-      await this.recorderRepository.save(recorder, );
+      if (!conference) {
+        conference = this.conferenceRepository.create();
+        conference.recordingCount = 0;
+        conference.roomId = payload.roomId;
+        conference.roomSid = payload.roomSid;
+        await this.conferenceRepository.insert(conference);
+      }
+
+      await this.recorderRepository.save(recorder);
       this.taskService.deleteRecorderPing(recorder.recorderId);
 
       await this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{
@@ -161,20 +172,30 @@ export class PlugNMeetService {
     await this.httpService.sendErrorMessage(payload);
   }
   async stopRecording(payload: PlugNMeetToRecorder) {
-    const recorder = await this.recorderRepository.findOne({ where: { roomSid: payload.roomSid } })
+    const recorder = await this.recorderRepository.findOne({ where: { roomSid: payload.roomSid } });
+    const conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
     if (recorder) {
       // Dont need to stop recording, its already been stopped
       if (!recorder.isRecording) return;
+
       // Emit events to stop recordings...
       await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
+        recordingPart: conference.recordingCount
       });
+
       await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
-        epiphanId: "LBTUEpiphanTest1"
+        epiphanId: "LBTUEpiphanTest1",
+        recordingPart: conference.recordingCount
       });
+
+      if (conference) {
+        conference.recordingCount += 1;
+        await this.conferenceRepository.save(conference);
+      }
 
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);

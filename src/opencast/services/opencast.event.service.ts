@@ -52,7 +52,7 @@ export class OpencastEventService {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const params = new URLSearchParams();
     params.set('mediaPackage', mediaPackage);
-    params.set('workflowDefinitionId', 'schedule-and-upload');
+    params.set('workflowDefinitionId', 'lbtu-wf-upload');
     params.set('workflowInstanceId', eventId);
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/ingest`, {}, {
       headers: headers,
@@ -63,11 +63,11 @@ export class OpencastEventService {
       handleAxiosExceptions(),
     ));
   }
-  async addTrackFileFromFs(mediaPackage: string, uri: string) {
+  async addTrackFileFromFs(mediaPackage: string, uri: string, sourceType: string) {
     const videoFile = await fs.readFile(uri);
     const data = new FormData();
     data.append('mediaPackage', mediaPackage);
-    data.append('flavor', 'presenter/source');
+    data.append('flavor', `${sourceType}/source`);
     data.append('BODY1', new Blob([videoFile]), basename(uri));
     const headers = this.makeAuthHeader('multipart/form-data');
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/addTrack`, data, {

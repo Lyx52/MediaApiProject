@@ -10,9 +10,8 @@ import { StartEgressRecordingDto } from "../dto/StartEgressRecordingDto";
 import { EgressStatus } from "livekit-server-sdk/dist/proto/livekit_egress";
 import { LivekitTaskService } from "./livekit.task.service";
 import { StopEgressRecordingDto } from "../dto/StopEgressRecordingDto";
-import { MediaType } from "../dto/enums/MediaType";
 import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
-import { existsSync } from "fs";
+import { OpencastIngestType } from "../../opencast/dto/enums/OpencastIngestType";
 
 @Injectable()
 export class LivekitEgressService {
@@ -44,7 +43,9 @@ export class LivekitEgressService {
             recorderId: data.recorderId,
             roomSid: data.roomSid,
             //uri: `${this.recordingLocation}/${file.filename}`,
-            uri: './sample-10s.mp4'
+            uri: './sample-10s.mp4',
+            type: OpencastIngestType.ROOM_COMPOSITE,
+            part: data.recordingPart
           });
         }
       }

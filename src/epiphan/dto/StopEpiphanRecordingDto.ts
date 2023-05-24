@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNotEmpty, IsString } from "class-validator";
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsString } from "class-validator";
 
 export class StopEpiphanRecordingDto {
   @IsString()
@@ -10,4 +10,7 @@ export class StopEpiphanRecordingDto {
   @IsString()
   @IsNotEmpty()
   readonly epiphanId: string;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly recordingPart: number;
 }

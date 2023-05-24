@@ -16,6 +16,7 @@ import { ADD_OPENCAST_INGEST_JOB, EPIPHAN_SERVICE } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
 import * as path from "path";
+import { OpencastIngestType } from "../../opencast/dto/enums/OpencastIngestType";
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
@@ -132,6 +133,8 @@ export class EpiphanService {
                 recorderId: data.recorderId,
                 roomSid: data.roomSid,
                 uri: uploadLocation,
+                type: OpencastIngestType.PRESENTER,
+                part: data.recordingPart
               });
             });
           }),

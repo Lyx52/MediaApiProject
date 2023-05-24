@@ -23,12 +23,14 @@ export class EpiphanController {
   }
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
+    return true;
     this.logger.debug("START_EPIPHAN_RECORDING");
     return this.epiphanService.startEpiphanRecording(data);
   }
 
   @EventPattern(STOP_EPIPHAN_RECORDING)
   async stopEpiphanRecording(@Body() data: StopEpiphanRecordingDto) {
+    return true;
     this.logger.debug("STOP_EPIPHAN_RECORDING");
     await this.epiphanService.stopEpiphanRecording(data);
     await this.epiphanService.downloadLastRecording(data);

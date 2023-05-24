@@ -9,6 +9,7 @@ import { OpencastModule } from "./opencast/opencast.module";
 import { EgressSession } from "./livekit/entities/EgressSession";
 import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/opencast.event";
+import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -16,7 +17,7 @@ import { OpencastEvent } from "./opencast/entities/opencast.event";
       host: 'localhost',
       database: 'LbtuMediaDb',
       port: 27017,
-      entities: [Epiphan, Recorder, EgressSession, OpencastEvent],
+      entities: [Epiphan, Recorder, EgressSession, OpencastEvent, ConferenceSession],
       synchronize: true,
       useUnifiedTopology: true
     }),

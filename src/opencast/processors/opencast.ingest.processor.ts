@@ -143,7 +143,7 @@ export class OpencastVideoIngestConsumer {
       /**
        *  We update the mediapackage on opencast side
        */
-      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri);
+      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri, `${job.data.type}-${job.data.part}`);
       mediaPackageInfo.version += 1;
       this.logger.debug(`Updating mediapackage for event ${event.eventId}, version ${mediaPackageInfo.version}, \nfile ${job.data.uri}!`);
       /**

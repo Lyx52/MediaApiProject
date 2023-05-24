@@ -12,9 +12,10 @@ import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
 import config from '../common/utils/config.yaml';
 import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
+import { ConferenceSession } from "./entities/ConferenceSession";
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Recorder]),
+    TypeOrmModule.forFeature([Recorder, ConferenceSession]),
     ClientsModule.register([{ name: PLUGNMEET_SERVICE, transport: Transport.TCP }]),
     ScheduleModule.forRoot(),
     RedisModule.forRoot({

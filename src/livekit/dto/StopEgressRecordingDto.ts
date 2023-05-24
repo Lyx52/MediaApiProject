@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { IsNotEmpty, IsNumber, IsString } from "class-validator";
 
 export class StopEgressRecordingDto {
   @IsString()
@@ -7,4 +7,7 @@ export class StopEgressRecordingDto {
   @IsString()
   @IsNotEmpty()
   readonly roomSid: string;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly recordingPart: number;
 }
