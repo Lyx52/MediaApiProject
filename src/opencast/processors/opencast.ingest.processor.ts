@@ -37,6 +37,7 @@ export class OpencastVideoIngestConsumer {
   }
   @Process(INGEST_MEDIAPACKAGE_JOB)
   async ingestMediaPackage(job: Job<IngestMediaPackageDto>) {
+    this.logger.debug("Started INGEST_MEDIAPACKAGE_JOB");
     const allJobs = await job.queue.getJobs(['active', 'paused', 'waiting', 'delayed'])
     /**
      *  Filter jobs, if any are active, we cannot ingest mediapackage!
@@ -92,6 +93,7 @@ export class OpencastVideoIngestConsumer {
   }
   @Process(INGEST_VIDEO_JOB)
   async ingestVideoFile(job: Job<IngestJobDto>) {
+    this.logger.debug("Started INGEST_VIDEO_JOB");
     if (!existsSync(job.data.uri)) {
       await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!` });
       return;

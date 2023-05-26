@@ -18,8 +18,8 @@ import { RedisModule } from "@liaoliaots/nestjs-redis";
       name: 'video',
       defaultJobOptions: {
         attempts: 50,
-        removeOnComplete: true
-      }
+        removeOnComplete: true,
+      },
     }),
     TypeOrmModule.forFeature([OpencastEvent]),
     HttpModule.register({

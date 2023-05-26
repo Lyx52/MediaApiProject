@@ -22,6 +22,7 @@ export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
 // Job patterns
 export const INGEST_VIDEO_JOB = 'INGEST_VIDEO_JOB';
 export const INGEST_MEDIAPACKAGE_JOB = 'INGEST_MEDIAPACKAGE_JOB';
+export const DOWNLOAD_VIDEO_JOB = 'DOWNLOAD_VIDEO_JOB';
 
 // Other constants
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';

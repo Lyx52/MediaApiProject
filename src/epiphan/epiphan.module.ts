@@ -8,9 +8,18 @@ import { ConfigModule } from "@nestjs/config";
 import config from "../common/utils/config.yaml";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { EPIPHAN_SERVICE } from "../app.constants";
+import { BullModule } from "@nestjs/bull";
+import { EpiphanDownloadConsumer } from "./processors/epiphan.download.processor";
 
 @Module({
   imports: [
+    BullModule.registerQueue({
+      name: 'download',
+      defaultJobOptions: {
+        attempts: 50,
+        removeOnComplete: true
+      }
+    }),
     TypeOrmModule.forFeature([Epiphan]),
     HttpModule.register({
       timeout: 5000,
@@ -20,7 +29,7 @@ import { EPIPHAN_SERVICE } from "../app.constants";
     ConfigModule.forRoot({ load: [config] }),
   ],
   providers: [
-    EpiphanService,
+    EpiphanService, EpiphanDownloadConsumer
   ],
   controllers: [EpiphanController]
 })

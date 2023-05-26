@@ -11,16 +11,11 @@ import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../c
 import { StopEpiphanRecordingDto } from "../dto/StopEpiphanRecordingDto";
 import { ConfigService } from "@nestjs/config";
 import { GetEpiphanRecordingsDto } from "../dto/GetEpiphanRecordingsDto";
-import { createWriteStream, existsSync, mkdirSync, renameSync } from 'fs';
 import { ADD_OPENCAST_INGEST_JOB, EPIPHAN_SERVICE } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
-import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
-import * as path from "path";
-import { OpencastIngestType } from "../../opencast/dto/enums/OpencastIngestType";
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
-  private readonly recordingLocation: string;
   constructor(
     @InjectRepository(Epiphan)
     private readonly epiphanRepository: MongoRepository<Epiphan>,
@@ -28,7 +23,6 @@ export class EpiphanService {
     private readonly config: ConfigService,
     @Inject(EPIPHAN_SERVICE) private readonly client: ClientProxy
   ) {
-    this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
   }
 
   async findAll(): Promise<Epiphan[]> {
@@ -99,53 +93,7 @@ export class EpiphanService {
     const files = response.result;
     return files.reduce((prev, curr) => Date.parse(curr.created) > Date.parse(prev.created) ? curr : prev);
   };
-  async downloadLastRecording(data: StopEpiphanRecordingDto) {
-    const epiphanConfig = await this.findConfig(data.epiphanId);
 
-    if (!epiphanConfig) {
-      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
-      return false;
-    }
-    const recording: any = await this.getLastEpiphanRecording(<GetEpiphanRecordingsDto>data);
-    // TODO: Implement download functionality
-    if (recording.id) {
-      try {
-        const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-        if (!existsSync(this.recordingLocation)){
-          mkdirSync(this.recordingLocation);
-        }
-        const downloadLocation = path.join(this.recordingLocation, recording.id);
-        const uploadLocation = path.join(this.recordingLocation, `${recording.name}.mp4`)
-        await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/archive/files/${recording.id}`, {
-          headers: headers,
-          responseType: "stream"
-        }).pipe(
-          map(async(response) => {
-            const writer = createWriteStream(downloadLocation);
-            await response.data.pipe(writer);
-            await writer.on('error', (err) => {
-              this.logger.error(`Error while downloading epiphan file: ${err}`);
-            });
-            await writer.on('finish', async () => {
-              renameSync(downloadLocation, uploadLocation);
-              this.logger.log(`File downloaded successfully to ${uploadLocation}`);
-              await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
-                recorderId: data.recorderId,
-                roomSid: data.roomSid,
-                uri: uploadLocation,
-                type: OpencastIngestType.PRESENTER,
-                part: data.recordingPart
-              });
-            });
-          }),
-          retryPolicy(),
-          handleAxiosExceptions(),
-        ));
-      } catch (e) {
-        this.logger.error(`Error while downloading epiphan file: ${e}`);
-      }
-    }
-  }
   async startEpiphanRecording(data: StartEpiphanRecordingDto): Promise<boolean> {
     const epiphanConfig = await this.findConfig(data.epiphanId);
 

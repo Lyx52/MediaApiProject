@@ -27,8 +27,6 @@ import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
         host: '85.254.205.116',
         port: 6379,
       },
-
-
     }),
     EpiphanModule, PlugNMeetModule, LivekitModule, OpencastModule
   ],
