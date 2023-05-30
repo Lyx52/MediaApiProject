@@ -13,4 +13,8 @@ export class ConferenceSession {
   roomId: string;
   @Column()
   recordingCount: number;
+  @Column()
+  started: number;
+  @Column()
+  ended: number;
 }

@@ -17,6 +17,7 @@ livekit:
   host: LIVEKIT_SERVER_DOMAIN
   key: LIVEKIT_API_KEY
   secret: LIVEKIT_SECRET
+  rtmp_url: LIVEKIT_PUBLIC_RTMP_URL
 opencast:
   host: OPENCAST_HOSTNAME
   username: OPENCAST_USERNAME

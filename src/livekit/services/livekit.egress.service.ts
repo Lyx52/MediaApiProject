@@ -35,7 +35,7 @@ export class LivekitEgressService {
     try {
       const info = await this.egressClient.stopEgress(session.egressId);
       const files = info.fileResults;
-      if (files) {
+      if (files && data.ingestRecording) {
         // Add each file to opencast queue
         for (const file of files) {
           // if (!existsSync(`${this.recordingLocation}/${file.filename}`)) continue;
@@ -71,6 +71,7 @@ export class LivekitEgressService {
   }
   async startEgressRecording(data: StartEgressRecordingDto): Promise<boolean> {
     // Recorder has sessions, that are starting, active or ending, abort!
+    //TODO: Move to this.egressClient.listEgress -> roomId has any active egress sessions
     const activeSessions = await this.egressSessionRepository.find({
       where: { recorderId: data.recorderId, status: { $in: [ EgressStatus.EGRESS_STARTING, EgressStatus.EGRESS_ACTIVE, EgressStatus.EGRESS_ENDING ] } }
     });

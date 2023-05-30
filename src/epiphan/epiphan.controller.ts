@@ -17,7 +17,8 @@ export class EpiphanController {
   constructor(
     private readonly epiphanService: EpiphanService,
     @InjectQueue('download') private downloadQueue: Queue,
-  ) {}
+  ) {
+  }
 
   @Get()
   async findAll(): Promise<Epiphan[]> {
@@ -30,13 +31,34 @@ export class EpiphanController {
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
     this.logger.debug("START_EPIPHAN_RECORDING");
-    return this.epiphanService.startEpiphanRecording(data);
+    let success = true;
+    success &&= await this.epiphanService.startEpiphanRecording(data);
+    success &&= await this.epiphanService.startEpiphanLivestream(data);
+
+    // We have failed to start, stop everything...
+    if (!success) {
+      await this.epiphanService.stopEpiphanLivestream(<StopEpiphanRecordingDto>{
+        epiphanId: data.epiphanId,
+        recorderId: data.recorderId,
+        roomSid: data.roomSid,
+        recordingPart: -1
+      });
+      await this.epiphanService.stopEpiphanRecording(<StopEpiphanRecordingDto>{
+        epiphanId: data.epiphanId,
+        recorderId: data.recorderId,
+        roomSid: data.roomSid,
+        recordingPart: -1
+      });
+    }
+    return success;
   }
 
   @EventPattern(STOP_EPIPHAN_RECORDING)
   async stopEpiphanRecording(@Body() data: StopEpiphanRecordingDto) {
     this.logger.debug("STOP_EPIPHAN_RECORDING");
-    await this.epiphanService.stopEpiphanRecording(data);
-    await this.downloadQueue.add(DOWNLOAD_VIDEO_JOB, <DownloadJobDto>data);
+    await this.epiphanService.stopEpiphanLivestream(data);
+    if (await this.epiphanService.stopEpiphanRecording(data) && data.ingestRecording) {
+      await this.downloadQueue.add(DOWNLOAD_VIDEO_JOB, <DownloadJobDto>data);
+    }
   }
 }

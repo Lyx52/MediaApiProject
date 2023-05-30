@@ -16,4 +16,7 @@ export class CreateEpiphanDto {
   @IsNumber()
   @IsNotEmpty()
   readonly defaultChannel: number;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly defaultPublisher: number;
 }

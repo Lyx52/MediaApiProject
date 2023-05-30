@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString } from "class-validator";
+import { IsBoolean, IsNotEmpty, IsNumber, IsString } from "class-validator";
 
 export class StopEgressRecordingDto {
   @IsString()
@@ -10,4 +10,6 @@ export class StopEgressRecordingDto {
   @IsNumber()
   @IsNotEmpty()
   readonly recordingPart: number;
+  @IsBoolean()
+  readonly ingestRecording: boolean;
 }

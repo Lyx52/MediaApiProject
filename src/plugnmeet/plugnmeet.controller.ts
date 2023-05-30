@@ -30,7 +30,8 @@ export class PlugNMeetController {
           await this.pnmService.stopRecording(payload);
           this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
             roomSid: payload.roomSid,
-            recorderId: payload.recordingId
+            recorderId: payload.recordingId,
+            roomId: payload.roomId
           })
         } break;
         case RecordingTasks.STOP_RECORDING: {

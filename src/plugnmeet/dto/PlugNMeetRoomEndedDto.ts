@@ -7,5 +7,8 @@ export class PlugNMeetRoomEndedDto {
   @IsString()
   @IsNotEmpty()
   readonly recorderId: string;
+  @IsString()
+  @IsNotEmpty()
+  readonly roomId: string;
 }
 

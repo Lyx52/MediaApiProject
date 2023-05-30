@@ -10,4 +10,6 @@ export class StartEpiphanRecordingDto {
   @IsString()
   @IsNotEmpty()
   readonly epiphanId: string;
+  @IsString()
+  readonly roomId: string;
 }

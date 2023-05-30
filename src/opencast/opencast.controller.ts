@@ -20,7 +20,8 @@ export class OpencastController {
   constructor(
     private readonly eventService: OpencastEventService,
     @InjectQueue('video') private ingestQueue: Queue,
-  ) {}
+  ) {
+  }
   @EventPattern(CREATE_OPENCAST_EVENT)
   async createOpencastEvent(@Body() data: CreateOpencastEventDto) {
     this.logger.debug("CREATE_OPENCAST_EVENT");

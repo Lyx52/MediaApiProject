@@ -18,6 +18,8 @@ export const CREATE_OPENCAST_EVENT = { cmd: "createOpencastEvent" }
 export const START_OPENCAST_INGEST = { cmd: "startOpencastIngest" }
 export const ADD_OPENCAST_INGEST_JOB = { cmd: "addOpencastIngestJob" }
 export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
+export const CREATE_OR_GET_INGRESS_STREAM_KEY = { cmd: 'createOrGetIngressStreamKey' }
+
 
 // Job patterns
 export const INGEST_VIDEO_JOB = 'INGEST_VIDEO_JOB';

@@ -56,6 +56,7 @@ export class OpencastVideoIngestConsumer {
     });
     if (!event || !event.eventId)
     {
+      this.logger.error(`INGEST_MEDIAPACKAGE_JOB failed because event does not exist or is not created!`);
       await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because event does not exist or is not created!` });
       return;
     }
@@ -73,6 +74,7 @@ export class OpencastVideoIngestConsumer {
       let mediaPackageInfo: any = await this.redisClient.hget(EVENT_MEDIAPACKAGE_RESOURCE_KEY, event.eventId);
       if (!mediaPackageInfo)
       {
+        this.logger.error(`INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!`);
         await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!` });
         return;
       }
@@ -95,6 +97,7 @@ export class OpencastVideoIngestConsumer {
   async ingestVideoFile(job: Job<IngestJobDto>) {
     this.logger.debug("Started INGEST_VIDEO_JOB");
     if (!existsSync(job.data.uri)) {
+      this.logger.error(`INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!`);
       await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!` });
       return;
     }
@@ -106,6 +109,7 @@ export class OpencastVideoIngestConsumer {
     });
     if (!event || !event.eventId)
     {
+      this.logger.error(`INGEST_VIDEO_JOB failed because event does not exist or is not created!`);
       await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because event does not exist or is not created!` });
       return;
     }

@@ -39,12 +39,13 @@ export class EpiphanDownloadConsumer {
     const epiphanConfig = await this.epiphanService.findConfig(job.data.epiphanId);
 
     if (!epiphanConfig) {
+      this.logger.error(`DOWNLOAD_VIDEO_JOB failed because epiphan configuration ${job.data.epiphanId} does not exist or is not created!`);
       await job.moveToFailed({ message: `DOWNLOAD_VIDEO_JOB failed because epiphan configuration ${job.data.epiphanId} does not exist or is not created!` });
       return;
     }
 
     const recording: any = await this.epiphanService.getLastEpiphanRecording(<GetEpiphanRecordingsDto>job.data);
-    if (recording.id) {
+    if (Object.keys(recording).length > 0) {
       const downloadLocation = path.join(this.recordingLocation, recording.id);
       const uploadLocation = path.join(this.recordingLocation, `${recording.name}.mp4`);
 
@@ -83,7 +84,7 @@ export class EpiphanDownloadConsumer {
         ));
 
         if (success) {
-          this.logger.log(`File downloaded successfully to ${uploadLocation}`);
+          this.logger.debug(`File downloaded successfully to ${uploadLocation}`);
           await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
             recorderId: job.data.recorderId,
             roomSid: job.data.roomSid,
@@ -94,11 +95,13 @@ export class EpiphanDownloadConsumer {
           await job.moveToCompleted();
           return;
         }
+
         await job.moveToFailed({
           message: `DOWNLOAD_VIDEO_JOB failed because there was an error while downloading the video file!`
         });
         return;
       } catch (e) {
+        this.logger.error(`DOWNLOAD_VIDEO_JOB failed because epiphan device could not be reached!\n${e}`);
         await job.moveToFailed({
           message: `DOWNLOAD_VIDEO_JOB failed because epiphan device could not be reached!\n${e}`
         });
@@ -106,6 +109,7 @@ export class EpiphanDownloadConsumer {
       }
     }
 
+    this.logger.error(`DOWNLOAD_VIDEO_JOB failed because epiphan device doesn't contain any recordings!`);
     await job.moveToFailed({
       message: `DOWNLOAD_VIDEO_JOB failed because epiphan device doesn't contain any recordings!`
     });

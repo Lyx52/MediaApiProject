@@ -132,7 +132,8 @@ export class PlugNMeetService {
       if (!await firstValueFrom(this.client.send<boolean>(START_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
-        epiphanId: "LBTUEpiphanTest1"
+        roomId: payload.roomId,
+        epiphanId: "LBTUEpiphanTest3"
       })))
       {
         // Cannot start epiphan recording
@@ -140,6 +141,7 @@ export class PlugNMeetService {
         await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
           recorderId: recorder.recorderId,
           roomSid:  recorder.roomSid,
+          ingestRecording: false
         });
         await this.httpService.sendErrorMessage(payload, recorder.recorderId);
         return;
@@ -182,14 +184,16 @@ export class PlugNMeetService {
       await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
-        recordingPart: conference.recordingCount
+        recordingPart: conference.recordingCount,
+        ingestRecording: true
       });
 
       await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
         recorderId: recorder.recorderId,
         roomSid:  recorder.roomSid,
-        epiphanId: "LBTUEpiphanTest1",
-        recordingPart: conference.recordingCount
+        epiphanId: "LBTUEpiphanTest3",
+        recordingPart: conference.recordingCount,
+        ingestRecording: true
       });
 
       if (conference) {
