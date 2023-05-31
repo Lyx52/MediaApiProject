@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { CreateOpencastEventDto } from "../dto/CreateOpencastEventDto";
 import { ConfigService } from "@nestjs/config";
@@ -15,8 +15,8 @@ import { IngestJobDto } from "../dto/IngestJobDto";
 import * as fs from 'fs/promises';
 import { basename } from "path";
 @Injectable()
-export class OpencastEventService {
-  private readonly logger: Logger = new Logger(OpencastEventService.name);
+export class OpencastService implements OnModuleInit {
+  private readonly logger: Logger = new Logger(OpencastService.name);
   private readonly host: string;
   private readonly password: string;
   private readonly username: string;
@@ -28,7 +28,47 @@ export class OpencastEventService {
     this.host = this.config.getOrThrow<string>("opencast.host");
     this.password = this.config.getOrThrow<string>("opencast.password");
     this.username = this.config.getOrThrow<string>("opencast.username");
+
   }
+
+  async onModuleInit() {
+    try {
+      const acl = await this.getAccessListTemplate("public");
+      if (!acl)
+      {
+        // Create public ACL
+        await this.generateAccessListTemplate([
+          {
+            "allow": true,
+            "role": "ROLE_ADMIN",
+            "action": "read"
+          },
+          {
+            "allow": true,
+            "role": "ROLE_ANONYMOUS",
+            "action": "read"
+          },
+          {
+            "allow": true,
+            "role": "ROLE_ADMIN",
+            "action": "write"
+          }
+        ], "public");
+      }
+      //this.logger.debug(await this.createMediaPackageWithId("testId1111222"));
+      this.logger.debug(this.generateEventDublinCore(
+        "TestDC",
+        "Math",
+        "LBTU",
+        "test-series",
+        new Date(),
+        new Date()
+      ));
+    } catch (e) {
+      this.logger.error(`Error while initializing opencast service module \n  ${e}`);
+    }
+  }
+
   async findEventById(id: string) {
     return this.findEvent({ id: ObjectID(id) });
   }
@@ -41,6 +81,26 @@ export class OpencastEventService {
   async createMediaPackage() {
     const headers = this.makeAuthHeader();
     return firstValueFrom(this.httpService.get(`${this.host}/ingest/createMediaPackage`, {
+      headers: headers
+    }).pipe(
+      map((response) => response.data.toString()),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
+  async getMediaPackageByEventId(eventId: string) {
+    const headers = this.makeAuthHeader();
+    return firstValueFrom(this.httpService.get(`${this.host}/recordings/${eventId}/mediapackage.xml`, {
+      headers: headers
+    }).pipe(
+      map((response) => response.data.toString()),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
+  async createMediaPackageWithId(mediaPackageId: string) {
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
+    return firstValueFrom(this.httpService.put(`${this.host}/ingest/createMediaPackageWithID/${mediaPackageId}`, {}, {
       headers: headers
     }).pipe(
       map((response) => response.data.toString()),
@@ -78,34 +138,223 @@ export class OpencastEventService {
       handleAxiosExceptions(),
     ));
   }
+  async getUserData() {
+    const headers = this.makeAuthHeader();
+    return firstValueFrom(this.httpService.get(`${this.host}/api/info/me`, {
+      headers: headers
+    }).pipe(
+      map((response) => response.data),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
+  async createSeries(seriesName, roomName, lang = "lv", aclName = "public", seriesContributor = "PlugNMeet", seriesCreator = "LBTUMediaAPI")
+  {
+    const metadata = [
+      {
+        'flavor': 'dublincore/series',
+        'title': 'Opencast Series DublinCore',
+        'fields': [
+          {
+            'readOnly': false,
+            'id': 'title',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.TITLE',
+            'type': 'text',
+            'value': seriesName,
+            'required': true
+          },
+          {
+            'readOnly': false,
+            'id': 'subjects',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.SUBJECT',
+            'type': 'text',
+            'value': [
+              `PlugNMeet-${seriesName}`
+            ],
+            'required': false
+          },
+          {
+            'readOnly': false,
+            'id': 'description',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.DESCRIPTION',
+            'type': 'text',
+            'value': `PlugNMeet conference for ${roomName}`,
+            'required': false
+          },
+          {
+            'translatable': true,
+            'readOnly': false,
+            'id': 'language',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.LANGUAGE',
+            'type': 'text',
+            'value': lang,
+            'required': false
+          },
+          {
+            'readOnly': false,
+            'id': 'rightsHolder',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.RIGHTS',
+            'type': 'text',
+            'value': "",
+            'required': false
+          },
+          {
+            'translatable': true,
+            'readOnly': false,
+            'id': 'license',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.LICENSE',
+            'type': 'text',
+            'value': "",
+            'required': false
+          },
+          {
+            'translatable': false,
+            'readOnly': false,
+            'id': 'creator',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.CREATED_BY',
+            'type': 'mixed_text',
+            'value': [
+              seriesCreator, seriesContributor
+            ],
+            'required': false
+          },
+          {
+            'translatable': false,
+            'readOnly': false,
+            'id': 'contributor',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.CONTRIBUTORS',
+            'type': 'mixed_text',
+            'value': [seriesContributor],
+            'required': false
+          },
+          {
+            'translatable': false,
+            'readOnly': false,
+            'id': 'publisher',
+            'label': 'EVENTS.SERIES.DETAILS.METADATA.PUBLISHERS',
+            'type': 'mixed_text',
+            'value': [],
+            'required': false
+          }
+        ]
+      }
+    ];
+
+    const res = await this.getAccessListTemplate(aclName);
+    const data = new FormData();
+    data.append("metadata", JSON.stringify(metadata));
+    data.append("acl", JSON.stringify(res.acl.ace));
+
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded')
+    return firstValueFrom(this.httpService.post(`${this.host}/api/series`, data, {
+      headers: headers
+    }).pipe(
+      map((response) => response.data),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  };
+
+  private generateDublinCore(terms: any): string {
+    return this.generateOCCatalog("dublincore", "http://www.opencastproject.org/xsd/1.0/dublincore/","http://purl.org/dc/terms/", terms)
+  }
+
+  /**
+   * Generates Opencast catalog(Dublincast etc)
+   * @param rootTag - Root tag of the catalog
+   * @param rootNamespace - Root namespace
+   * @param termNamespace - Term namepsace
+   * @param terms -> key: value or object { key: value }
+   * @private
+   */
+  private generateOCCatalog(rootTag: string, rootNamespace: string, termNamespace: string, terms: any): string {
+    let catalog = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n";
+    catalog += `<${rootTag} xmlns=\"${rootNamespace}\" xmlns:terms=\"${termNamespace}\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n`
+
+    Object.entries(terms).forEach(([key, value]) => {
+      switch(key)
+      {
+        case "duration":
+        case "extent":
+          catalog += `<terms:extent xsi:type=\"terms:ISO8601\">${value instanceof Date ? value.toISOString() : value}</terms:extent>\n`
+          break;
+        case "startDate":
+        case "temporal":
+          // We convert
+          catalog += "<terms:temporal xsi:type=\"terms:Period\">";
+            if (value instanceof Object) {
+              Object.entries(value).forEach(([subKey, subValue]) => {
+                catalog += `${subKey}=${subValue instanceof Date ? subValue.toISOString() : subValue}; `;
+              });
+            } else {
+              catalog += value instanceof Date ? value.toISOString() : value;
+            }
+          catalog += "</terms:temporal>";
+          break;
+        default:
+          catalog += `<terms:${key}>${value instanceof Date ? value.toISOString() : value}</terms:${key}>`
+          break;
+      }
+    });
+    catalog += `</${rootTag}>\n`;
+    return catalog;
+  }
+
+  private generateEventDublinCore(
+    title: string,
+    subject: string,
+    location: string,
+    series: string,
+    start: Date,
+    end: Date,
+    description = "",
+    language = "lv",
+    publisher = "LBTU",
+    contributor = "PlugNMeet",
+    creator = "LBTUMediaAPI"
+  ) {
+    return this.generateDublinCore(
+      {
+        created: start,
+        temporal: {
+          start: start,
+          end: end,
+          scheme: "W3C-DTF"
+        },
+        isPartOf: series,
+        language: language,
+        spatial: location,
+        title: title,
+        subject: subject,
+        description: description,
+        publisher: publisher,
+        creator: creator,
+        contributor: contributor,
+        rightsHolder: publisher,
+        source: "8018b5af-c519-4a0d-b140-2183e91b16f6",
+        license: "ALLRIGHTS"
+      })
+  }
   async addDublinCore(event: OpencastEvent, mediaPackage: string) {
     const params = new URLSearchParams();
     params.set('mediaPackage', mediaPackage);
-    const dublinCore =
-      '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' +
-      '<dublincore xmlns="http://www.opencastproject.org/xsd/1.0/dublincore/"\n' +
-      '    xmlns:dcterms="http://purl.org/dc/terms/"\n' +
-      '    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n' +
-      '  <dcterms:creator>{CHANGE_THIS}</dcterms:creator>\n' +
-      `  <dcterms:created xsi:type="dcterms:W3CDTF">${event.start.toISOString()}</dcterms:created>\n` +
-      `  <dcterms:temporal xsi:type="dcterms:Period">start=${event.start.toISOString()}; end=${event.end.toISOString()}; scheme=W3C-DTF;</dcterms:temporal>\n` +
-      `  <dcterms:language>Latvian</dcterms:language>\n` +
-      `  <dcterms:spatial>${event.recorderId}_${event.roomSid}_${event.name}</dcterms:spatial>\n` +
-      `  <dcterms:title>${event.start.toLocaleDateString(
-        'lv-LV',
-      )} ${event.name} recording</dcterms:title>\n` +
-      '</dublincore>';
+    const dublinCore = this.generateEventDublinCore(
+      `${event.start.toLocaleDateString('lv-LV')} ${event.name} recording`,
+      event.subject || "PlugNMeet Conference",
+      event.location || "PlugNMeet Conference",
+      `${event.name} PlugNMeet recording`,
+      event.start,
+      event.end
+    );
     params.set('dublinCore', dublinCore);
     params.set('flavor', 'dublincore/episode');
 
-    const headers = this.makeAuthHeader(
-      'application/x-www-form-urlencoded; charset=utf-8',
-    );
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded; charset=utf-8',);
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/addDCCatalog`, {}, {
       headers: headers,
       params: params
     }).pipe(
-      map((response) => response.data.toString()),
+      map((response) => response.data),
       retryPolicy(),
       handleAxiosExceptions(),
     ));
@@ -152,6 +401,7 @@ export class OpencastEventService {
     params.set('mediaPackage', mediaPackage);
     params.set('users', 'admin');
     params.set('source', event.name);
+
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     await firstValueFrom(this.httpService.post(`${this.host}/recordings/`, {},{
       headers: headers,
@@ -176,6 +426,7 @@ export class OpencastEventService {
     ));
   };
   async removeOldScheduledRecordings(buffer = 60) {
+    return;
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const params = new URLSearchParams();
     params.set('buffer', buffer.toString());
@@ -209,6 +460,10 @@ export class OpencastEventService {
 
   };
   async getAccessListTemplate(aclName: string): Promise<any> {
+    const acls = await this.getAccessListTemplates();
+    return acls.find(a => a.name.toLowerCase() === aclName.toLowerCase());
+  }
+  async getAccessListTemplates(): Promise<any> {
     const headers = this.makeAuthHeader();
     return firstValueFrom(this.httpService.get( `${this.host}/acl-manager/acl/acls.json`, {
       headers: headers
@@ -218,11 +473,30 @@ export class OpencastEventService {
       handleAxiosExceptions(),
     ));
   }
+
+  async generateAccessListTemplate(ace: any, name: string)
+  {
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
+    const data = new FormData();
+    data.set("name", name);
+    data.set("acl", JSON.stringify({
+      "acl": {
+        "ace": ace
+      }
+    }));
+    return firstValueFrom(this.httpService.post( `${this.host}/acl-manager/acl`, data, {
+      headers: headers,
+
+    }).pipe(
+      map((response) => response.data),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
+
   async setAccessListTemplate(event: OpencastEvent, aclName: string) {
-    const acls = await this.getAccessListTemplate(aclName);
-    const acl = acls.filter((e: any) => e.name === aclName)[0];
-    if (!acl)
-      throw `Cannot find access list template ${aclName}!`;
+    const acl = await this.getAccessListTemplate(aclName);
+    if (!acl) throw `Cannot find access list template ${aclName}!`;
     const params = new URLSearchParams();
     params.set('acl', JSON.stringify(acl));
     params.set('override', 'true');
@@ -323,6 +597,8 @@ export class OpencastEventService {
     // End of recording is in one hour
     // TODO: Change this to one hour currently 60 sec
     event.end.setTime(event.start.getTime() + 60000);
+    const series: any = await this.createSeries(`${data.name} PlugNMeet recording`, data.name);
+    event.seriesId = series.identifier;
     /**
      * Add capture agent if dosnt exist, set it to idle for now
      */
@@ -331,7 +607,7 @@ export class OpencastEventService {
     /**
      *  Create MediaPackage and add DublinCore metadata to MediaPackage
      */
-    let mediaPackage = await this.createMediaPackage();
+    let mediaPackage = await this.createMediaPackageWithId(`${data.roomSid}_${data.recorderId}`);
     mediaPackage = await this.addDublinCore(event, <string>mediaPackage);
     /**
      * Create recording, if not already created

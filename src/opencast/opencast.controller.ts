@@ -8,7 +8,7 @@ import {
 import { ClientProxy, Ctx, EventPattern, MessagePattern, Payload, RedisContext } from "@nestjs/microservices";
 import { CreateOpencastEventDto } from "./dto/CreateOpencastEventDto";
 import { StartOpencastIngestDto } from "./dto/StartOpencastIngestDto";
-import { OpencastEventService } from "./services/opencast.event.service";
+import { OpencastService } from "./services/opencast.service";
 import { IngestJobDto } from "./dto/IngestJobDto";
 import { Queue } from "bull";
 import { InjectQueue } from "@nestjs/bull";
@@ -18,7 +18,7 @@ import { IngestMediaPackageDto } from "./dto/IngestMediaPackageDto";
 export class OpencastController {
   private readonly logger: Logger = new Logger(OpencastController.name);
   constructor(
-    private readonly eventService: OpencastEventService,
+    private readonly eventService: OpencastService,
     @InjectQueue('video') private ingestQueue: Queue,
   ) {
   }

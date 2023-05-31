@@ -1,4 +1,4 @@
-import { Process, Processor } from "@nestjs/bull";
+import { OnQueueActive, Process, Processor } from "@nestjs/bull";
 import { Job, JobStatus } from "bull";
 import { Logger } from "@nestjs/common";
 import {
@@ -7,7 +7,7 @@ import {
   MEDIAPACKAGE_LOCK_TTL,
   PLUGNMEET_RECORDER_INFO_KEY
 } from "../../app.constants";
-import { OpencastEventService } from "../services/opencast.event.service";
+import { OpencastService } from "../services/opencast.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { OpencastEvent } from "../entities/opencast.event";
 import { MongoRepository } from "typeorm";
@@ -24,7 +24,7 @@ export class OpencastVideoIngestConsumer {
   private readonly logger: Logger = new Logger(OpencastVideoIngestConsumer.name);
   private redlock: Redlock;
   constructor(
-    private readonly eventService: OpencastEventService,
+    private readonly eventService: OpencastService,
     @InjectRedis() private readonly redisClient: Redis,
     @InjectRepository(OpencastEvent) private readonly eventRepository: MongoRepository<OpencastEvent>
   ) {
@@ -35,20 +35,31 @@ export class OpencastVideoIngestConsumer {
       retryJitter: 200,
     });
   }
+  @OnQueueActive()
+  async onQueueActive(job: Job) {
+    if (job.name === INGEST_MEDIAPACKAGE_JOB) {
+      const { roomSid } = job.data;
+      const activeVideoJobs = await job.queue.getJobs(['active', 'paused', 'waiting', 'delayed']);
+      const videoJobsToWaitFor = activeVideoJobs.filter(
+        (j: Job<IngestJobDto>) => j.name === INGEST_VIDEO_JOB && j.data.roomSid === roomSid
+      );
+      if (videoJobsToWaitFor.length > 0) {
+        job.queue.on('completed', async (eventJob) => {
+          if (
+            eventJob.name === INGEST_VIDEO_JOB &&
+            eventJob.data.roomSid === roomSid &&
+            videoJobsToWaitFor.includes(eventJob)
+          ) {
+            await job.retry();
+          }
+        });
+      }
+    }
+  }
+
   @Process(INGEST_MEDIAPACKAGE_JOB)
   async ingestMediaPackage(job: Job<IngestMediaPackageDto>) {
     this.logger.debug("Started INGEST_MEDIAPACKAGE_JOB");
-    const allJobs = await job.queue.getJobs(['active', 'paused', 'waiting', 'delayed'])
-    /**
-     *  Filter jobs, if any are active, we cannot ingest mediapackage!
-     */
-    if (allJobs.filter((j: Job<IngestJobDto>) => j.data.roomSid == job.data.roomSid && j.id != job.id).length > 0)
-    {
-      // Wait for 2 seconds
-      await (new Promise(resolve => setTimeout(resolve, INGEST_JOB_RETRY)));
-      await job.retry();
-      return;
-    }
     const event = await this.eventRepository.findOne({
       where: {
         roomSid: job.data.roomSid
@@ -117,7 +128,6 @@ export class OpencastVideoIngestConsumer {
     const lock: RLock = await this.redlock.acquire([resourceKey], MEDIAPACKAGE_LOCK_TTL);
     let watch: string;
     try {
-
       watch = await this.redisClient.watch(PLUGNMEET_RECORDER_INFO_KEY);
       if (watch !== 'OK') {
         await new Promise((res) => setTimeout(res, 1000));
@@ -131,7 +141,7 @@ export class OpencastVideoIngestConsumer {
       // Media package does not exist, create one
       if (!mediaPackageInfo)
       {
-        const mediaPackage = <string>await this.eventService.createMediaPackage();
+        const mediaPackage = <string>await this.eventService.getMediaPackageByEventId(event.eventId);
         mediaPackageInfo = {
           version: 0,
           data: mediaPackage

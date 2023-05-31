@@ -12,7 +12,16 @@ export class OpencastEvent {
   name: string;
 
   @Column()
+  subject: string;
+
+  @Column()
+  location: string;
+
+  @Column()
   eventId: string;
+
+  @Column()
+  seriesId: string;
 
   @Column()
   roomSid: string;

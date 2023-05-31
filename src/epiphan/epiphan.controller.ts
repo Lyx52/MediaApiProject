@@ -30,6 +30,7 @@ export class EpiphanController {
   }
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
+    return true;
     this.logger.debug("START_EPIPHAN_RECORDING");
     let success = true;
     success &&= await this.epiphanService.startEpiphanRecording(data);
@@ -55,6 +56,7 @@ export class EpiphanController {
 
   @EventPattern(STOP_EPIPHAN_RECORDING)
   async stopEpiphanRecording(@Body() data: StopEpiphanRecordingDto) {
+    return;
     this.logger.debug("STOP_EPIPHAN_RECORDING");
     await this.epiphanService.stopEpiphanLivestream(data);
     if (await this.epiphanService.stopEpiphanRecording(data) && data.ingestRecording) {

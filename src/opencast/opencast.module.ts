@@ -4,7 +4,7 @@ import { OPENCAST_SERVICE } from "../app.constants";
 import { OpencastController } from "./opencast.controller";
 import { BullModule } from "@nestjs/bull";
 import { HttpModule } from "@nestjs/axios";
-import { OpencastEventService } from "./services/opencast.event.service";
+import { OpencastService } from "./services/opencast.service";
 import { ConfigModule } from "@nestjs/config";
 import config from "../common/utils/config.yaml";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -38,7 +38,7 @@ import { RedisModule } from "@liaoliaots/nestjs-redis";
     }),
     ConfigModule.forRoot({ load: [config] }),
   ],
-  providers: [OpencastVideoIngestConsumer, OpencastEventService],
+  providers: [OpencastVideoIngestConsumer, OpencastService],
   controllers: [OpencastController],
 })
 export class OpencastModule {}

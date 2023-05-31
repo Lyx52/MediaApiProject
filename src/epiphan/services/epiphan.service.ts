@@ -225,6 +225,7 @@ export class EpiphanService {
             started: true,
             'single-touch': false,
             'disable-audio': false,
+            // Always override, because this might be without domain/behind nginx etc.
             url: this.livekitRTMPUrl,
             stream: streamKeyCreateResponse.data.streamKey,
             username: '',

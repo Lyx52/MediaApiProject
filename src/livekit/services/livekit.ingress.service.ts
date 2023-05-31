@@ -70,7 +70,6 @@ export class LivekitIngressService {
         participantName: ''
       };
       const result = await this.ingressClient.createIngress(IngressInput.RTMP_INPUT, options);
-      // Always override, because this might be without domain/behind nginx etc.
       return <ServiceMessageResponse<IngressInfo>>{
         success: result !== undefined && result !== null,
         data: result
