@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Cron, SchedulerRegistry } from "@nestjs/schedule";
 import Redis from "ioredis";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
@@ -10,7 +10,7 @@ import { EgressSession } from "../entities/EgressSession";
 import { MongoRepository } from "typeorm";
 
 @Injectable()
-export class LivekitTaskService {
+export class LivekitTaskService implements OnModuleInit {
   private readonly logger = new Logger(LivekitTaskService.name);
   private readonly egressClient: EgressClient;
   constructor(
@@ -24,7 +24,6 @@ export class LivekitTaskService {
       this.config.getOrThrow<string>("livekit.key"),
       this.config.getOrThrow<string>("livekit.secret"),
     );
-    // TODO: This Sync task should run at startup...
   }
   @Cron('30 * * * * *')
   async syncEgressSessions() {
@@ -38,5 +37,10 @@ export class LivekitTaskService {
       await this.egressSessionRepository.save(session);
     }
     // TODO: Implement a way to delete entries out of redis egress:room:room* -> egressId
+  }
+
+  async onModuleInit()
+  {
+    await this.syncEgressSessions();
   }
 }

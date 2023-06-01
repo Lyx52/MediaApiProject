@@ -25,17 +25,9 @@ export class PlugNMeetController {
           await this.pnmService.startRecording(payload);
         }
           break;
-        case RecordingTasks.STOP: {
-          this.logger.debug(`STOP for ${payload.roomSid} roomSid!`);
-          await this.pnmService.stopRecording(payload);
-          this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-            roomSid: payload.roomSid,
-            recorderId: payload.recordingId,
-            roomId: payload.roomId
-          })
-        } break;
+        case RecordingTasks.STOP:
         case RecordingTasks.STOP_RECORDING: {
-          this.logger.debug(`STOP_RECORDING for ${payload.roomSid} roomSid!`);
+          this.logger.debug(`${payload.task} for ${payload.roomSid} roomSid!`);
           await this.pnmService.stopRecording(payload);
         } break;
       }

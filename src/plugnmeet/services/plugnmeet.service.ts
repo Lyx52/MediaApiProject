@@ -1,20 +1,24 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
-import { PlugNmeet } from 'plugnmeet-sdk-js';
+import { PlugNmeet } from "plugnmeet-sdk-js";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import {
   CREATE_OPENCAST_EVENT,
   PLUGNMEET_RECORDER_INFO_KEY,
+  PLUGNMEET_ROOM_ENDED,
   PLUGNMEET_SERVICE,
   START_EPIPHAN_RECORDING,
-  START_LIVEKIT_EGRESS_RECORDING, START_OPENCAST_INGEST, STOP_EPIPHAN_RECORDING, STOP_LIVEKIT_EGRESS_RECORDING
+  START_LIVEKIT_EGRESS_RECORDING,
+  START_OPENCAST_INGEST,
+  STOP_EPIPHAN_RECORDING,
+  STOP_LIVEKIT_EGRESS_RECORDING
 } from "../../app.constants";
 import { Recorder } from "../entities/Recorder";
 import { PlugNMeetTaskService } from "./plugnmeet.task.service";
 import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
-import { PlugNMeetToRecorder, RecorderToPlugNMeet, RecordingTasks } from "../../proto/plugnmeet_recorder_pb";
+import { PlugNMeetToRecorder, RecordingTasks } from "../../proto/plugnmeet_recorder_pb";
 import { ConfigService } from "@nestjs/config";
 import { ClientProxy } from "@nestjs/microservices";
 import { StartEgressRecordingDto } from "../../livekit/dto/StartEgressRecordingDto";
@@ -24,11 +28,12 @@ import { StopEgressRecordingDto } from "../../livekit/dto/StopEgressRecordingDto
 import { CreateOpencastEventDto } from "../../opencast/dto/CreateOpencastEventDto";
 import { PlugNMeetHttpService } from "./plugnmeet.http.service";
 import { StartOpencastIngestDto } from "../../opencast/dto/StartOpencastIngestDto";
-import { randomStringGenerator } from "@nestjs/common/utils/random-string-generator.util";
 import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
 import { ConferenceSession } from "../entities/ConferenceSession";
+import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
+
 @Injectable()
-export class PlugNMeetService {
+export class PlugNMeetService implements OnModuleInit {
   private readonly logger = new Logger(PlugNMeetService.name);
   private readonly PNMController: PlugNmeet;
 
@@ -46,7 +51,10 @@ export class PlugNMeetService {
       config.getOrThrow<string>('plugnmeet.key'),
       config.getOrThrow<string>('plugnmeet.secret'),
     );
-    this.addRecorders(config.getOrThrow<number>('appconfig.max_recorders'))
+  }
+
+  async onModuleInit() {
+    await this.addRecorders(this.config.getOrThrow<number>('appconfig.max_recorders'))
       .then(r => this.logger.debug(`Added ${r} recorders...`));
   }
   makeRecorderId(length) {
@@ -213,6 +221,13 @@ export class PlugNMeetService {
         recorderId: recorder.recorderId,
         roomSid: recorder.roomSid
       });
+      if (payload.task == RecordingTasks.STOP) {
+        this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
+          roomSid: payload.roomSid,
+          recorderId: payload.recordingId,
+          roomId: payload.roomId
+        });
+      }
       return;
     }
     this.logger.error(`Recorder dosn't exist for room ${payload.roomSid}!`);

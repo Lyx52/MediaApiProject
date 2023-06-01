@@ -1,20 +1,41 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { SchedulerRegistry } from "@nestjs/schedule";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Cron, SchedulerRegistry } from "@nestjs/schedule";
 import Redis from "ioredis";
 import { InjectRepository } from "@nestjs/typeorm";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import { MongoRepository } from "typeorm";
 import { PLUGNMEET_RECORDER_INFO_KEY } from "src/app.constants";
 import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
+import { CronJob } from "cron";
+import { PlugNmeet } from "plugnmeet-sdk-js";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
-export class PlugNMeetTaskService {
+export class PlugNMeetTaskService implements OnModuleInit {
   private readonly logger = new Logger(PlugNMeetTaskService.name);
 
+  private readonly PNMController: PlugNmeet;
   constructor(
     private schedulerRegistry: SchedulerRegistry,
+    private readonly config: ConfigService,
     @InjectRedis() private readonly redisClient: Redis,
   ) {
+    this.PNMController = new PlugNmeet(
+      config.getOrThrow<string>('plugnmeet.host'),
+      config.getOrThrow<string>('plugnmeet.key'),
+      config.getOrThrow<string>('plugnmeet.secret'),
+    );
+  }
+
+  @Cron('30 * * * * *')
+  async syncRoomState()
+  {
+    const rooms = await this.PNMController.getActiveRoomsInfo();
+  }
+
+  async onModuleInit()
+  {
+    await this.syncRoomState();
   }
   addRecorderPing(recorderId: string) {
     if (!this.schedulerRegistry.doesExist("interval", `${recorderId}_PING`)) {

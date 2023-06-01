@@ -153,10 +153,6 @@ export class OpencastVideoIngestConsumer {
 
       const redisChain = this.redisClient.multi({ pipeline: true });
       /**
-       *  Determine where the file is located based on the device
-       *  TODO: Might need to move downloading from epiphan to different job
-       */
-      /**
        *  We update the mediapackage on opencast side
        */
       mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri, `${job.data.type}-${job.data.part}`);
