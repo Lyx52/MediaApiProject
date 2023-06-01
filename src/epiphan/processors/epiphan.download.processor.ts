@@ -59,7 +59,7 @@ export class EpiphanDownloadConsumer {
         });
 
         const success = await firstValueFrom(
-        this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/archive/files/${recording.id}`, {
+        this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.default_channel || 1}/archive/files/${recording.id}`, {
           headers: headers,
           responseType: "stream"
         }).pipe(

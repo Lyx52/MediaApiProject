@@ -1,18 +1,19 @@
 import { IsBoolean, IsNotEmpty, IsNumber, IsString } from "class-validator";
 
-export class StopEgressRecordingDto {
+export class EgressSessionInfoDto {
   @IsString()
   @IsNotEmpty()
-  readonly recorderId: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly roomId: string;
+  readonly egressId: string;
   @IsString()
   @IsNotEmpty()
   readonly roomSid: string;
   @IsNumber()
   @IsNotEmpty()
   readonly recordingPart: number;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly lastUpdated: number;
   @IsBoolean()
-  readonly ingestRecording: boolean;
+  @IsNotEmpty()
+  readonly isRecording: boolean;
 }

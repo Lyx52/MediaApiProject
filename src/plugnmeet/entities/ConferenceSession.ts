@@ -1,4 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne, ObjectID, ObjectIdColumn } from "typeorm";
+import { ActiveRoomInfo } from "plugnmeet-sdk-js";
 
 /**
  * Entity that holds one conference session
@@ -12,9 +13,9 @@ export class ConferenceSession {
   @Column()
   roomId: string;
   @Column()
-  recordingCount: number;
+  epiphanId: string;
   @Column()
-  started: number;
+  recorderId: string;
   @Column()
-  ended: number;
+  metadata: ActiveRoomInfo;
 }

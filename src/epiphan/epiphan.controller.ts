@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Logger, Post } from "@nestjs/common";
 import { EpiphanService } from "./services/epiphan.service";
-import { Epiphan } from "./epiphan.entity";
 import { CreateEpiphanDto } from "./dto/CreateEpiphanDto";
 import { EventPattern, MessagePattern } from "@nestjs/microservices";
 import { StartEpiphanRecordingDto } from "./dto/StartEpiphanRecordingDto";
@@ -11,6 +10,7 @@ import { GetEpiphanRecordingsDto } from "./dto/GetEpiphanRecordingsDto";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { DownloadJobDto } from "./dto/DownloadJobDto";
+import { RecordingDeviceDto } from "./dto/RecordingDeviceDto";
 @Controller('epiphan')
 export class EpiphanController {
   private readonly logger: Logger = new Logger(EpiphanController.name);
@@ -21,13 +21,10 @@ export class EpiphanController {
   }
 
   @Get()
-  async findAll(): Promise<Epiphan[]> {
-    return this.epiphanService.findAll();
+  async getAllDeviceLocations(): Promise<RecordingDeviceDto[]> {
+    return this.epiphanService.getAllDeviceLocations();
   }
-  @Post('create')
-  async add(@Body() createEpiphanDto: CreateEpiphanDto) {
-    return this.epiphanService.addConfig(createEpiphanDto);
-  }
+
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
     this.logger.debug("START_EPIPHAN_RECORDING");
@@ -39,14 +36,10 @@ export class EpiphanController {
     if (!success) {
       await this.epiphanService.stopEpiphanLivestream(<StopEpiphanRecordingDto>{
         epiphanId: data.epiphanId,
-        recorderId: data.recorderId,
-        roomSid: data.roomSid,
         recordingPart: -1
       });
       await this.epiphanService.stopEpiphanRecording(<StopEpiphanRecordingDto>{
         epiphanId: data.epiphanId,
-        recorderId: data.recorderId,
-        roomSid: data.roomSid,
         recordingPart: -1
       });
     }

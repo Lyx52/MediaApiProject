@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
-import { Epiphan } from "../epiphan.entity";
 import { CreateEpiphanDto } from "../dto/CreateEpiphanDto";
 import { HttpService } from "@nestjs/axios";
 import { StartEpiphanRecordingDto } from "../dto/StartEpiphanRecordingDto";
@@ -23,53 +22,35 @@ import { CreateOrGetIngressStreamKeyDto } from "../../livekit/dto/CreateOrGetIng
 import * as stream from "stream";
 import { DownloadJobDto } from "../dto/DownloadJobDto";
 import { IngressInfo } from "livekit-server-sdk";
+import { RecordingDeviceDto } from "../dto/RecordingDeviceDto";
+import { EpiphanDto } from "../dto/EpiphanDto";
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
   private readonly livekitRTMPUrl: string;
+  private readonly epiphanDevices: EpiphanDto[];
   constructor(
-    @InjectRepository(Epiphan)
-    private readonly epiphanRepository: MongoRepository<Epiphan>,
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
     @Inject(EPIPHAN_SERVICE) private readonly client: ClientProxy
   ) {
     this.livekitRTMPUrl = this.config.getOrThrow<string>("livekit.rtmp_url");
+    this.epiphanDevices = this.config.getOrThrow<EpiphanDto[]>("epiphan_config");
   }
 
-  async findAll(): Promise<Epiphan[]> {
-    return this.findAllSelectFields(['id', 'name', 'host']);
-  }
-  async findAllSelectFields(fields): Promise<Epiphan[]> {
-    return this.epiphanRepository.find({select: fields});
-  }
-  async findConfig(epiphanId: string): Promise<Epiphan> {
-    return this.epiphanRepository.findOne({
-      where: {
-        epiphanId: epiphanId
-      },
-      select: ['id', 'epiphanId', 'host', 'password', 'username'],
+  getAllDeviceLocations(): RecordingDeviceDto[] {
+    return this.epiphanDevices.map(cfg => <RecordingDeviceDto>{
+      deviceIdentifier: cfg.identifier,
+      deviceName: cfg.name
     });
   }
-  async addConfig(data: CreateEpiphanDto): Promise<ObjectID> {
-    const entity = this.epiphanRepository.create();
-    entity.isRecording = false;
-    entity.isLivestreaming = false;
-    entity.epiphanId = data.epiphanId;
-    entity.defaultPublisher = data.defaultPublisher;
-    entity.defaultChannel = data.defaultChannel;
-    entity.password = data.password;
-    entity.username = data.username;
-    entity.host = data.host;
-    const result = await this.epiphanRepository.insertOne(entity);
-    return result.insertedId;
+  findConfig(epiphanId: string): EpiphanDto {
+    return <EpiphanDto>this.epiphanDevices.find(cfg => cfg.identifier === epiphanId);
   }
-
   /**
    * Stops epiphan livestreams using epiphan API
    *  1. Finds epiphan device by epiphanId
    *  2. Stops epiphan livestream using API
-   *  3. Updates epiphan livestreaming state
    * @param data
    */
   async stopEpiphanLivestream(data: StopEpiphanRecordingDto): Promise<boolean> {
@@ -87,7 +68,7 @@ export class EpiphanService {
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
       const response: any = await firstValueFrom(this.httpService.post(
-        `${epiphanConfig.host}/api/channels/${epiphanConfig.defaultChannel || 1}/publishers/${epiphanConfig.defaultPublisher || 0}/control/stop`, {}, {
+        `${epiphanConfig.host}/api/channels/${epiphanConfig.default_channel || 1}/publishers/${epiphanConfig.default_publisher || 0}/control/stop`, {}, {
         headers: headers
       }).pipe(
         map((response) => response.data),
@@ -99,10 +80,8 @@ export class EpiphanService {
       this.logger.error(`Error while starting Epiphan livestream: ${e}`);
       success = false;
     }
-
-    // 3. Update epiphan livestreaming state
-    epiphanConfig.isLivestreaming = false;
-    await this.epiphanRepository.save(epiphanConfig);
+    // If we are still livestreaming, something went wrong
+    success &&= !(await this.isLivestreaming(data.epiphanId));
     return success;
   }
 
@@ -127,7 +106,7 @@ export class EpiphanService {
     // 2. Stop epiphan recording using API
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/control/stop`, {}, {
+      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}/api/recorders/${epiphanConfig.default_channel || 1}/control/stop`, {}, {
         headers: headers
       }).pipe(
         map((response) => response.data),
@@ -139,12 +118,81 @@ export class EpiphanService {
       this.logger.error(`Error while starting Epiphan recording: ${e}`);
       success = false;
     }
-
-    // 4. Update epiphan recording state
-    epiphanConfig.isRecording = false;
-    await this.epiphanRepository.save(epiphanConfig);
+    // If we are still recording, something went wrong
+    success &&= !(await this.isRecording(data.epiphanId));
     return success;
   }
+
+  async isRecording(id: string): Promise<boolean> {
+    return (await this.getRecorderStatus(id)) === "started";
+  }
+
+  /**
+   * Gets current recorder statuses
+   * @param id - Epiphan identifier
+   */
+  async getRecorderStatus(id: string): Promise<any> {
+    const config = await this.findConfig(id);
+
+    if (!config) {
+      this.logger.error(`Epiphan configuration with id ${id} not found!`)
+      return false;
+    }
+
+    try {
+      const headers = makeBasicAuthHeader(config.username, config.password);
+      return await firstValueFrom(this.httpService.get(`${config.host}/api/recorders/${config.default_channel || 1}/status`, {
+        headers: headers
+      }).pipe(
+        map((response) => {
+          if(response.data.status === "ok" && response.data.result) {
+            return response.data.result.status
+          }
+          return "stopped";
+        }),
+        retryPolicy(),
+        handleAxiosExceptions(),
+      ));
+    } catch (e) {
+      this.logger.error(`Error while getting Epiphan publisher status: ${e}`);
+      return "stopped";
+    }
+  };
+
+  async isLivestreaming(id: string): Promise<boolean> {
+    return (await this.getPublisherStatus(id)) === "started";
+  }
+  /**
+   * Gets current publisher statuses
+   * @param id - Epiphan identifier
+   */
+  async getPublisherStatus(id: string) {
+    const config = await this.findConfig(id);
+
+    if (!config) {
+      this.logger.error(`Epiphan configuration with id ${id} not found!`)
+      return false;
+    }
+
+    try {
+      const headers = makeBasicAuthHeader(config.username, config.password);
+      return await firstValueFrom(this.httpService.get(`${config.host}/api/channels/${config.default_channel || 1}/publishers/${config.default_publisher || 0}/status`, {
+        headers: headers
+      }).pipe(
+        map((response) => {
+          if(response.data.status === "ok" && response.data.result) {
+            return response.data.result.status
+          }
+          return "stopped";
+        }),
+        retryPolicy(),
+        handleAxiosExceptions(),
+      ));
+    } catch (e) {
+      this.logger.error(`Error while getting Epiphan publisher status: ${e}`);
+      return false;
+    }
+  };
 
   /**
    * Gets all epiphan recordings
@@ -163,7 +211,7 @@ export class EpiphanService {
     // 2. Get all epiphan recordings as json
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-      return await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/archive/files`, {
+      return await firstValueFrom(this.httpService.get(`${epiphanConfig.host}/api/recorders/${epiphanConfig.default_channel || 1}/archive/files`, {
         headers: headers
       }).pipe(
         map((response) => response.data),
@@ -192,7 +240,6 @@ export class EpiphanService {
    *  1. Finds epiphan device by epiphanId
    *  2. Sends message to livekit to create or get stream key
    *  3. Updates epiphan rtmp livestream config including the streamkey
-   *  4. Updates epiphan livestreaming state based on if stream started
    * @param data
    */
   async startEpiphanLivestream(data: StartEpiphanRecordingDto): Promise<boolean> {
@@ -219,7 +266,7 @@ export class EpiphanService {
         const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
         headers["Content-Type"] = "application/json";
         const response: any = await firstValueFrom(this.httpService.patch(
-          `${epiphanConfig.host}/api/channels/${epiphanConfig.defaultChannel || 1}/publishers/${epiphanConfig.defaultPublisher || 0}/settings`,
+          `${epiphanConfig.host}/api/channels/${epiphanConfig.default_channel || 1}/publishers/${epiphanConfig.default_publisher || 0}/settings`,
           {
             type: 'rtmp',
             started: true,
@@ -231,7 +278,7 @@ export class EpiphanService {
             username: '',
             password: '',
             auto_created: false,
-            name: `${data.roomId || "PlugNMeet Livestream"}`,
+            name: `${data.roomTitle || "PlugNMeet Livestream"}`,
           }, { headers: headers }).pipe(
           map((response) => response.data),
           retryPolicy(),
@@ -244,9 +291,6 @@ export class EpiphanService {
       }
     }
 
-    // 4. Update epiphan livestreaming state
-    epiphanConfig.isLivestreaming = success;
-    await this.epiphanRepository.save(epiphanConfig);
     return success;
   }
 
@@ -265,13 +309,13 @@ export class EpiphanService {
     const epiphanConfig = await this.findConfig(data.epiphanId);
 
     if (!epiphanConfig) {
-      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
+      this.logger.error(`Epiphan configuration with id ${data.epiphanId} not found!`)
       success = false;
     }
     // 2. Start epiphan recording
     try {
       const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
-      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}/api/recorders/${epiphanConfig.defaultChannel || 1}/control/start`, {}, {
+      const response: any = await firstValueFrom(this.httpService.post(`${epiphanConfig.host}/api/recorders/${epiphanConfig.default_channel || 1}/control/start`, {}, {
         headers: headers
       }).pipe(
         map((response) => response.data),
@@ -283,10 +327,6 @@ export class EpiphanService {
       this.logger.error(`Error while starting Epiphan: ${e}`);
       success = false;
     }
-
-    // 3. Update epiphan recording state
-    epiphanConfig.isRecording = success;
-    await this.epiphanRepository.save(epiphanConfig);
     return success;
   }
 }

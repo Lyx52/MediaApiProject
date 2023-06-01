@@ -22,3 +22,25 @@ opencast:
   host: OPENCAST_HOSTNAME
   username: OPENCAST_USERNAME
   password: OPENCAST_PASSWORD
+epiphan_config:
+  - name: DEVICE_NAME_0
+    identifier: DEVICE_IDENTIFIER_0
+    host: DEVICE_HOSTNAME
+    username: DEVICE_USERNAME
+    password: DEVICE_PASSWORD
+    default_channel: DEFAULT_LAYOUT
+    default_publisher: DEFAULT_RTMP_PUBLISHER
+  - name: DEVICE_NAME_1
+    identifier: DEVICE_IDENTIFIER_1
+    host: DEVICE_HOSTNAME
+    username: DEVICE_USERNAME
+    password: DEVICE_PASSWORD
+    default_channel: DEFAULT_LAYOUT
+    default_publisher: DEFAULT_RTMP_PUBLISHER
+  - name: DEVICE_NAME_n
+    identifier: DEVICE_IDENTIFIER_n
+    host: DEVICE_HOSTNAME
+    username: DEVICE_USERNAME
+    password: DEVICE_PASSWORD
+    default_channel: DEFAULT_LAYOUT
+    default_publisher: DEFAULT_RTMP_PUBLISHER

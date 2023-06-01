@@ -113,10 +113,7 @@ export class OpencastVideoIngestConsumer {
       return;
     }
     const event = await this.eventRepository.findOne({
-      where: {
-        roomSid: job.data.roomSid,
-        recorderId: job.data.recorderId
-      }
+      where: { roomSid: job.data.roomSid }
     });
     if (!event || !event.eventId)
     {

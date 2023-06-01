@@ -1,17 +1,15 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ADD_OPENCAST_INGEST_JOB, LIVEKIT_EGRESS_SERVICE } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
-import { EgressClient, EncodedFileType, EncodingOptionsPreset } from "livekit-server-sdk";
+import { EgressClient, EgressInfo, EncodedFileType, EncodingOptionsPreset } from "livekit-server-sdk";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { MongoRepository } from "typeorm";
-import { EgressSession } from "../entities/EgressSession";
 import { StartEgressRecordingDto } from "../dto/StartEgressRecordingDto";
 import { EgressStatus } from "livekit-server-sdk/dist/proto/livekit_egress";
-import { LivekitTaskService } from "./livekit.task.service";
 import { StopEgressRecordingDto } from "../dto/StopEgressRecordingDto";
 import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
 import { OpencastIngestType } from "../../opencast/dto/enums/OpencastIngestType";
+import { InjectRedis } from "@liaoliaots/nestjs-redis";
+import Redis from "ioredis";
 
 @Injectable()
 export class LivekitEgressService {
@@ -20,8 +18,7 @@ export class LivekitEgressService {
   private readonly recordingLocation: string;
   constructor(
     @Inject(LIVEKIT_EGRESS_SERVICE) private readonly client: ClientProxy,
-    @InjectRepository(EgressSession) private readonly egressSessionRepository: MongoRepository<EgressSession>,
-    private readonly taskService: LivekitTaskService,
+    @InjectRedis() private readonly redisClient: Redis,
     private readonly config: ConfigService,
   ) {
     this.egressClient = new EgressClient(
@@ -31,16 +28,16 @@ export class LivekitEgressService {
     );
     this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
   }
-  async stopEgressOrRetry(data: StopEgressRecordingDto, session: EgressSession, retries= 0) {
+  async stopEgressOrRetry(data: StopEgressRecordingDto, session: EgressInfo, retries= 0) {
     try {
       const info = await this.egressClient.stopEgress(session.egressId);
       const files = info.fileResults;
-      if (files && data.ingestRecording) {
+      // Ingest only from active sessions, ignore starting sessions
+      if (files && data.ingestRecording && session.status == EgressStatus.EGRESS_ACTIVE) {
         // Add each file to opencast queue
         for (const file of files) {
           // if (!existsSync(`${this.recordingLocation}/${file.filename}`)) continue;
           await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
-            recorderId: data.recorderId,
             roomSid: data.roomSid,
             //uri: `${this.recordingLocation}/${file.filename}`,
             uri: './sample-10s.mp4',
@@ -59,25 +56,21 @@ export class LivekitEgressService {
     }
   }
   async stopEgressRecording(data: StopEgressRecordingDto) {
-    const activeSessions = await this.egressSessionRepository.find({
-      where: { recorderId: data.recorderId, status: EgressStatus.EGRESS_ACTIVE }
-    });
+    const sessions = await this.egressClient.listEgress(data.roomId);
+    const activeSessions = sessions.filter(es =>
+      es.status == EgressStatus.EGRESS_ACTIVE ||
+      es.status == EgressStatus.EGRESS_STARTING)
     for (const session of activeSessions) {
       await this.stopEgressOrRetry(data, session);
-      // In any case, set egress as complete
-      session.status = EgressStatus.EGRESS_COMPLETE;
-      await this.egressSessionRepository.save(session);
     }
   }
   async startEgressRecording(data: StartEgressRecordingDto): Promise<boolean> {
-    // Recorder has sessions, that are starting, active or ending, abort!
-    //TODO: Move to this.egressClient.listEgress -> roomId has any active egress sessions
-    const activeSessions = await this.egressSessionRepository.find({
-      where: { recorderId: data.recorderId, status: { $in: [ EgressStatus.EGRESS_STARTING, EgressStatus.EGRESS_ACTIVE, EgressStatus.EGRESS_ENDING ] } }
-    });
+    const sessions = await this.egressClient.listEgress(data.roomId);
+
+    const activeSessions = sessions.filter(es => es.status == EgressStatus.EGRESS_ACTIVE);
     if (activeSessions.length > 0)
     {
-      this.logger.error(`Recorder ${data.recorderId} has ${activeSessions.length} active sessions!`);
+      this.logger.error(`Room ${data.roomId} has ${activeSessions.length} active egress sessions!`);
       return false;
     }
     try {
@@ -96,16 +89,7 @@ export class LivekitEgressService {
         this.logger.error(`Failed to start egress session for room ${data.roomId}!`);
         return false;
       }
-      if (result.egressId) {
-        const entity = this.egressSessionRepository.create();
-        entity.status = EgressStatus.EGRESS_ACTIVE;
-        entity.roomId = data.roomId;
-        entity.recorderId = data.recorderId;
-        entity.egressId = result.egressId;
-        entity.filesUploaded = false;
-        await this.egressSessionRepository.save(entity);
-        return true;
-      }
+      return true;
     } catch (e) {
       this.logger.error(`Caught exception while starting ${data.roomId} room egress!\n${e}`);
       return false;

@@ -11,7 +11,6 @@ import { LivekitEgressService } from "./services/livekit.egress.service";
 import { LivekitIngressService } from "./services/livekit.ingress.service";
 import { CreateOrGetIngressStreamKeyDto } from "./dto/CreateOrGetIngressStreamKeyDto";
 import { PlugNMeetRoomEndedDto } from "../plugnmeet/dto/PlugNMeetRoomEndedDto";
-import { IngestMediaPackageDto } from "../opencast/dto/IngestMediaPackageDto";
 
 @Controller('livekit')
 export class LivekitController {

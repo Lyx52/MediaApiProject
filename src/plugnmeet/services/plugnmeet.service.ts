@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
-import { PlugNmeet } from "plugnmeet-sdk-js";
+import { ActiveRoomInfo, CreateRoomResponse, PlugNmeet } from "plugnmeet-sdk-js";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import {
@@ -25,12 +25,10 @@ import { StartEgressRecordingDto } from "../../livekit/dto/StartEgressRecordingD
 import { firstValueFrom } from "rxjs";
 import { StartEpiphanRecordingDto } from "../../epiphan/dto/StartEpiphanRecordingDto";
 import { StopEgressRecordingDto } from "../../livekit/dto/StopEgressRecordingDto";
-import { CreateOpencastEventDto } from "../../opencast/dto/CreateOpencastEventDto";
 import { PlugNMeetHttpService } from "./plugnmeet.http.service";
-import { StartOpencastIngestDto } from "../../opencast/dto/StartOpencastIngestDto";
 import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
 import { ConferenceSession } from "../entities/ConferenceSession";
-import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
+import { CreateConferenceRoom } from "../dto/CreateConferenceRoom";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -47,9 +45,9 @@ export class PlugNMeetService implements OnModuleInit {
     @Inject(PLUGNMEET_SERVICE) private readonly client: ClientProxy
   ) {
     this.PNMController = new PlugNmeet(
-      config.getOrThrow<string>('plugnmeet.host'),
-      config.getOrThrow<string>('plugnmeet.key'),
-      config.getOrThrow<string>('plugnmeet.secret'),
+      this.config.getOrThrow<string>('plugnmeet.host'),
+      this.config.getOrThrow<string>('plugnmeet.key'),
+      this.config.getOrThrow<string>('plugnmeet.secret'),
     );
   }
 
@@ -68,27 +66,68 @@ export class PlugNMeetService implements OnModuleInit {
     }
     return result;
   }
+  async createConferenceRoom(payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
+    const response = await this.PNMController.createRoom({
+      room_id: payload.roomId,
+      metadata: payload.metadata,
+      empty_timeout: this.config.get<number>('plugnmeet.empty_room_timeout') || 900,
+      max_participants: this.config.get<number>('plugnmeet.max_room_participants') || 25
+    });
+    if (response.status) {
+      /**
+       * Conference is added create it
+       */
+      const entity = this.conferenceRepository.create();
+      entity.epiphanId = payload.epiphanId;
+      entity.roomId = payload.roomId;
+      entity.roomSid = response.roomInfo.sid;
+      entity.recorderId = null;
+      entity.metadata = <ActiveRoomInfo>{};
+      await this.conferenceRepository.insert(entity);
+    }
+    return response;
+  }
   async addRecorders(recorderCount: number) {
     const recorders = await this.recorderRepository.find();
+    const conferences = await this.conferenceRepository.find({
+      where: {
+        recorderId: { $in: recorders.map(r => r.recorderId) }
+      }
+    });
 
+    /**
+     *  We need to iterate through recorders and in case of
+     *  coldboot check if rooms exist and are recording
+     */
     for (const recorder of recorders) {
-      // Recorder is recording
+      const conference = conferences.find(c => c.recorderId === recorder.recorderId);
+      /**
+       *  Conference does not exist and we are still recording
+       */
+      if (recorder.isRecording && !conference) {
+        recorder.isRecording = false;
+        await this.recorderRepository.save(recorder);
+        await this.addAvailableRecorder(recorder.recorderId);
+        continue;
+      }
       if (recorder.isRecording) {
-        // Check if the room exists/is recording
-        const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: recorder.roomId });
-        // TODO: Possible fix to stupid logic?
+        /**
+         *  We update recorder status based on room metadata
+         */
+        const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: conference.roomId });
         if (roomInfo.status && roomInfo.room) {
-          if (roomInfo.room.room_info.is_recording) continue;
+          recorder.isRecording = roomInfo.room.room_info.is_recording;
+          await this.recorderRepository.save(recorder);
+          await this.addAvailableRecorder(recorder.recorderId);
+          conference.metadata = roomInfo.room.room_info;
+          conference.recorderId = roomInfo.room.room_info.is_recording ? recorder.recorderId : null;
+          await this.conferenceRepository.save(conference);
         }
       }
-
-      // Assume not recording...
-      recorder.isRecording = false;
-      await this.recorderRepository.save(recorder);
-      await this.addAvailableRecorder(recorder.recorderId);
     }
-
-    // Add missing recorders if count has increased
+    /**
+     *  Add missing recorders if count has increased
+     */
     for (let i = 0; i < (recorderCount - recorders.length); i++) {
       const recorder = this.recorderRepository.create();
       recorder.isRecording = false;
@@ -121,116 +160,144 @@ export class PlugNMeetService implements OnModuleInit {
   }
 
   async startRecording(payload: PlugNMeetToRecorder) {
-    const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } });
     let conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
-    if (recorder) {
-      // Start livekit egress recording
-      if (!await firstValueFrom(this.client.send<boolean>(START_LIVEKIT_EGRESS_RECORDING, <StartEgressRecordingDto>{
-        recorderId: recorder.recorderId,
-        roomId: payload.roomId,
-      })))
-      {
-        // Cannot start livekit egress recording
+    const recorder = await this.recorderRepository.findOne({ where: { isRecording: false } });
+    if (!recorder) {
+      this.logger.error(`There are no recorders available!`);
+      await this.httpService.sendErrorMessage(payload);
+      return;
+    }
+
+    if (!conference) {
+      /**
+       *  We do not have precreated conference, this means it was created without using our api,
+       *  It won't have epiphan device recordings!
+       */
+      conference = this.conferenceRepository.create();
+      conference.epiphanId = "LBTU_EPIPHAN_112"; // TODO: Remove this!!!!
+      conference.recorderId = recorder.recorderId;
+      conference.roomId = payload.roomId;
+      conference.roomSid = payload.roomSid;
+    } else {
+      /**
+       *  For sanity’s sake we check if conference dosnt have active recorder
+       */
+      const activeRecorders = await this.recorderRepository.count({ where: { recorderId: conference.recorderId, isRecording: true } });
+      if (activeRecorders > 0) {
         this.logger.error('Failed to start livekit egress recording!');
-        await this.httpService.sendErrorMessage(payload, recorder.recorderId);
+        await this.httpService.sendErrorMessage(payload, payload.recorderId);
         return;
       }
-
-      // Start epiphan recording
-      if (!await firstValueFrom(this.client.send<boolean>(START_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{
-        recorderId: recorder.recorderId,
-        roomSid:  recorder.roomSid,
-        roomId: payload.roomId,
-        epiphanId: "LBTUEpiphanTest3"
-      })))
-      {
-        // Cannot start epiphan recording
-        this.logger.error('Failed to start epiphan recording!');
-        await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
-          recorderId: recorder.recorderId,
-          roomSid:  recorder.roomSid,
-          ingestRecording: false
-        });
-        await this.httpService.sendErrorMessage(payload, recorder.recorderId);
-        return;
-      }
-
-      // Set recorder as currently recording
-      recorder.isRecording = true;
-      recorder.roomSid = payload.roomSid;
-      recorder.roomId = payload.roomId;
-      if (!conference) {
-        conference = this.conferenceRepository.create();
-        conference.recordingCount = 0;
-        conference.roomId = payload.roomId;
-        conference.roomSid = payload.roomSid;
-        await this.conferenceRepository.insert(conference);
-      }
-
-      await this.recorderRepository.save(recorder);
-      this.taskService.deleteRecorderPing(recorder.recorderId);
-
-      await this.client.emit(CREATE_OPENCAST_EVENT, <CreateOpencastEventDto>{
-        name: `RoomTest-${payload.roomSid}_${new Date().getMilliseconds()}`,
-        roomSid: payload.roomSid,
-        recorderId: recorder.recorderId
-      });
-      await this.httpService.sendStartedMessage(payload, recorder.recorderId);
+    }
+    const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId });
+    if (!roomInfo.status || !roomInfo || !roomInfo.room) {
+      this.logger.error(`There was error getting room metadata`);
+      await this.httpService.sendErrorMessage(payload);
       return;
     }
-    this.logger.error('No recorder is available!');
-    await this.httpService.sendErrorMessage(payload);
-  }
-  async stopRecording(payload: PlugNMeetToRecorder) {
-    const recorder = await this.recorderRepository.findOne({ where: { roomSid: payload.roomSid } });
-    const conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
-    if (recorder) {
-      // Dont need to stop recording, its already been stopped
-      if (!recorder.isRecording) return;
+    conference.metadata = roomInfo.room.room_info;
+    conference.recorderId = recorder.recorderId;
+    /**
+     *  Start egress recording, and await response
+     */
+    if (!await firstValueFrom(this.client.send<boolean>(START_LIVEKIT_EGRESS_RECORDING, <StartEgressRecordingDto>{ roomId: payload.roomId })))
+    {
+      this.logger.error('Failed to start livekit egress recording!');
+      await this.httpService.sendErrorMessage(payload, conference.recorderId);
+      return;
+    }
 
-      // Emit events to stop recordings...
+    /**
+     *  Start epiphan recording, and await response
+     */
+    if (!await firstValueFrom(this.client.send<boolean>(START_EPIPHAN_RECORDING, <StartEpiphanRecordingDto>{
+      roomId: payload.roomId,
+      epiphanId: conference.epiphanId,
+      roomTitle: conference.metadata.room_title
+    })))
+    {
+      // Cannot start epiphan recording
+      this.logger.error('Failed to start epiphan recording!');
       await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
-        recorderId: recorder.recorderId,
-        roomSid:  recorder.roomSid,
-        recordingPart: conference.recordingCount,
-        ingestRecording: true
+        recorderId: conference.recorderId,
+        ingestRecording: false
       });
-
-      await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
-        recorderId: recorder.recorderId,
-        roomSid:  recorder.roomSid,
-        epiphanId: "LBTUEpiphanTest3",
-        recordingPart: conference.recordingCount,
-        ingestRecording: true
-      });
-
-      if (conference) {
-        conference.recordingCount += 1;
-        await this.conferenceRepository.save(conference);
-      }
-
-      recorder.isRecording = false;
-      await this.recorderRepository.save(recorder);
-
-      this.taskService.addRecorderPing(recorder.recorderId);
-      await this.httpService.sendEndedMessage(payload, recorder.recorderId);
-      await this.httpService.sendCompletedMessage(payload, recorder.recorderId);
-
-      // Notify opencast that event is finished and can start ingesting
-      await this.client.emit(START_OPENCAST_INGEST, <StartOpencastIngestDto>{
-        recorderId: recorder.recorderId,
-        roomSid: recorder.roomSid
-      });
-      if (payload.task == RecordingTasks.STOP) {
-        this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-          roomSid: payload.roomSid,
-          recorderId: payload.recordingId,
-          roomId: payload.roomId
-        });
-      }
+      await this.httpService.sendErrorMessage(payload, conference.recorderId);
       return;
     }
-    this.logger.error(`Recorder dosn't exist for room ${payload.roomSid}!`);
-    await this.httpService.sendErrorMessage(payload);
+
+    /**
+     *  Update entities
+     */
+    recorder.isRecording = true;
+    await this.recorderRepository.save(recorder);
+    await this.conferenceRepository.save(conference);
+
+    this.taskService.deleteRecorderPing(conference.recorderId);
+    await this.httpService.sendStartedMessage(payload, conference.recorderId);
+  }
+
+  async stopRecording(payload: PlugNMeetToRecorder) {
+    const conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
+    if (!conference) {
+      /**
+       *  Room doesn't exist, we end the recording as we don't know about the state of recording
+       */
+      this.logger.error(`Conference doesn't exist for room ${payload.roomSid}!`);
+      await this.httpService.sendErrorMessage(payload);
+      await this.httpService.sendEndedMessage(payload, payload.recorderId);
+      await this.httpService.sendCompletedMessage(payload, payload.recorderId);
+      return;
+    } else {
+      const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId } });
+      if (!recorder) {
+        this.logger.error(`Recorder doesn't exist for room ${conference.roomSid}!`);
+        await this.httpService.sendErrorMessage(payload);
+        await this.httpService.sendEndedMessage(payload, payload.recorderId);
+        await this.httpService.sendCompletedMessage(payload, payload.recorderId);
+        return;
+      }
+
+      if (recorder.isRecording) {
+        /**
+         *   Stop egress recording
+         */
+        await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+          recorderId: conference.recorderId,
+          roomSid: conference.roomSid,
+          recordingPart: 0,
+          roomId: conference.roomId,
+          ingestRecording: true
+        });
+
+        /**
+         *   Stop epiphan recording
+         */
+        await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
+          recorderId: conference.recorderId,
+          roomSid: conference.roomSid,
+          epiphanId: conference.epiphanId,
+          recordingPart: 0,
+          ingestRecording: true
+        });
+
+        /**
+         *  Update entities
+         */
+        const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId });
+        if (roomInfo && roomInfo.room && conference) {
+          conference.metadata = roomInfo.room.room_info;
+          conference.recorderId = null;
+          await this.conferenceRepository.save(conference);
+        }
+
+        recorder.isRecording = false;
+        await this.recorderRepository.save(recorder);
+      }
+
+      await this.httpService.sendEndedMessage(payload, payload.recorderId);
+      await this.httpService.sendCompletedMessage(payload, payload.recorderId);
+      await this.addAvailableRecorder(recorder.recorderId);
+    }
   }
 }

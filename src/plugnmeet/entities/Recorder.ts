@@ -11,8 +11,4 @@ export class Recorder {
   recorderId: string;
   @Column()
   isRecording: boolean;
-  @Column()
-  roomSid: string;
-  @Column()
-  roomId: string;
 }

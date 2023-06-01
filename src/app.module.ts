@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Epiphan } from "./epiphan/epiphan.entity";
 import { EpiphanModule } from "./epiphan/epiphan.module";
 import { PlugNMeetModule } from "./plugnmeet/plugnmeet.module";
 import { LivekitModule } from "./livekit/livekit.module";
 import { Recorder } from "./plugnmeet/entities/Recorder";
 import { OpencastModule } from "./opencast/opencast.module";
-import { EgressSession } from "./livekit/entities/EgressSession";
 import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/opencast.event";
 import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
@@ -17,7 +15,7 @@ import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
       host: 'localhost',
       database: 'LbtuMediaDb',
       port: 27017,
-      entities: [Epiphan, Recorder, EgressSession, OpencastEvent, ConferenceSession],
+      entities: [Recorder, OpencastEvent, ConferenceSession],
       synchronize: true,
       useUnifiedTopology: true
     }),

@@ -31,6 +31,7 @@ export class PlugNMeetTaskService implements OnModuleInit {
   async syncRoomState()
   {
     const rooms = await this.PNMController.getActiveRoomsInfo();
+
   }
 
   async onModuleInit()
