@@ -9,6 +9,8 @@ import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
 import { CronJob } from "cron";
 import { PlugNmeet } from "plugnmeet-sdk-js";
 import { ConfigService } from "@nestjs/config";
+import { Recorder } from "../entities/Recorder";
+import { ConferenceSession } from "../entities/ConferenceSession";
 
 @Injectable()
 export class PlugNMeetTaskService implements OnModuleInit {
@@ -19,6 +21,8 @@ export class PlugNMeetTaskService implements OnModuleInit {
     private schedulerRegistry: SchedulerRegistry,
     private readonly config: ConfigService,
     @InjectRedis() private readonly redisClient: Redis,
+    @InjectRepository(Recorder) private readonly recorderRepository: MongoRepository<Recorder>,
+    @InjectRepository(ConferenceSession) private readonly conferenceRepository: MongoRepository<ConferenceSession>,
   ) {
     this.PNMController = new PlugNmeet(
       config.getOrThrow<string>('plugnmeet.host'),
@@ -30,8 +34,17 @@ export class PlugNMeetTaskService implements OnModuleInit {
   @Cron('30 * * * * *')
   async syncRoomState()
   {
-    const rooms = await this.PNMController.getActiveRoomsInfo();
-
+    const activeRooms = await this.PNMController.getActiveRoomsInfo();
+    const conferences = await this.conferenceRepository.find({
+      where: {
+        roomSid: { $in: activeRooms.rooms.map(r => r.room_info.sid) }
+      }
+    });
+    for (const conference of conferences) {
+      const room = activeRooms.rooms.find(r => r.room_info.sid);
+      conference.metadata = room.room_info;
+      await this.conferenceRepository.save(conference);
+    }
   }
 
   async onModuleInit()

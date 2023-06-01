@@ -60,6 +60,9 @@ export class OpencastVideoIngestConsumer {
   @Process(INGEST_MEDIAPACKAGE_JOB)
   async ingestMediaPackage(job: Job<IngestMediaPackageDto>) {
     this.logger.debug("Started INGEST_MEDIAPACKAGE_JOB");
+    await job.moveToCompleted();
+    return;
+
     const event = await this.eventRepository.findOne({
       where: {
         roomSid: job.data.roomSid
@@ -107,6 +110,9 @@ export class OpencastVideoIngestConsumer {
   @Process(INGEST_VIDEO_JOB)
   async ingestVideoFile(job: Job<IngestJobDto>) {
     this.logger.debug("Started INGEST_VIDEO_JOB");
+    await job.moveToCompleted();
+    return;
+
     if (!existsSync(job.data.uri)) {
       this.logger.error(`INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!`);
       await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!` });

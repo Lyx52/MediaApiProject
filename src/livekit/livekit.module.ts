@@ -9,6 +9,7 @@ import config from "../common/utils/config.yaml";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { HttpModule } from "@nestjs/axios";
+import { LivekitTaskService } from "./services/livekit.task.service";
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { HttpModule } from "@nestjs/axios";
     }),
 
   ],
-  providers: [LivekitIngressService, LivekitEgressService],
+  providers: [LivekitIngressService, LivekitEgressService, LivekitTaskService],
   controllers: [LivekitController],
 })
 export class LivekitModule {}
