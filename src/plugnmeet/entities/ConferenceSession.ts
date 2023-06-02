@@ -18,4 +18,6 @@ export class ConferenceSession {
   recorderId: string;
   @Column()
   metadata: ActiveRoomInfo;
+  @Column()
+  isActive: boolean;
 }

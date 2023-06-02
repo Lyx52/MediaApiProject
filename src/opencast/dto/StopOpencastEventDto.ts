@@ -1,9 +1,6 @@
 import { IsNotEmpty, IsString } from "class-validator";
 
-export class CreateOpencastEventDto {
-  @IsString()
-  @IsNotEmpty()
-  readonly name: string;
+export class StopOpencastEventDto {
   @IsString()
   @IsNotEmpty()
   readonly roomSid: string;

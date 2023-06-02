@@ -8,11 +8,9 @@ export class IngestJobDto {
   readonly roomSid: string;
   @IsString()
   @IsNotEmpty()
+  readonly recorderId: string;
+  @IsString()
+  @IsNotEmpty()
   readonly uri: string;
-  @IsNotEmpty()
-  readonly type: OpencastIngestType;
-  @IsNotEmpty()
-  @IsNumber()
-  readonly part: number;
 }
 

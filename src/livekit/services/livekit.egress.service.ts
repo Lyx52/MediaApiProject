@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { ADD_OPENCAST_INGEST_JOB, LIVEKIT_EGRESS_SERVICE } from "../../app.constants";
+import {
+  ADD_OPENCAST_INGEST_JOB,
+  START_OPENCAST_EVENT,
+  INGEST_VIDEO_JOB,
+  LIVEKIT_EGRESS_SERVICE, STOP_OPENCAST_EVENT
+} from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { EgressClient, EgressInfo, EncodedFileType, EncodingOptionsPreset } from "livekit-server-sdk";
 import { ConfigService } from "@nestjs/config";
@@ -10,6 +15,9 @@ import { IngestJobDto } from "../../opencast/dto/IngestJobDto";
 import { OpencastIngestType } from "../../opencast/dto/enums/OpencastIngestType";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
+import { StartOpencastEventDto } from "../../opencast/dto/StartOpencastEventDto";
+import { StopOpencastEventDto } from "../../opencast/dto/StopOpencastEventDto";
+import { firstValueFrom } from "rxjs";
 
 @Injectable()
 export class LivekitEgressService {
@@ -34,17 +42,24 @@ export class LivekitEgressService {
       const files = info.fileResults;
       // Ingest only from active sessions, ignore starting sessions
       if (files && data.ingestRecording && session.status == EgressStatus.EGRESS_ACTIVE) {
-        // Add each file to opencast queue
-        for (const file of files) {
-          // if (!existsSync(`${this.recordingLocation}/${file.filename}`)) continue;
-          await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
-            roomSid: data.roomSid,
-            //uri: `${this.recordingLocation}/${file.filename}`,
-            uri: './sample-10s.mp4',
-            type: OpencastIngestType.ROOM_COMPOSITE,
-            part: data.recordingPart
-          });
+
+        // We send a message and wait for answer
+        if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
+          roomSid: data.roomMetadata.sid,
+          recorderId: data.recorderId,
+        }))) {
+          // Add each file to opencast queue
+          for (const file of files) {
+            await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
+              recorderId: data.recorderId,
+              roomSid: data.roomMetadata.sid,
+              //uri: `${this.recordingLocation}/${file.filename}`,
+              uri: './sample-10s.mp4',
+              type: OpencastIngestType.ROOM_COMPOSITE
+            });
+          }
         }
+
       }
     } catch (e) {
       this.logger.error(`Failed to stop egress ${session.egressId}!`);
@@ -56,26 +71,34 @@ export class LivekitEgressService {
     }
   }
   async stopEgressRecording(data: StopEgressRecordingDto) {
-    const sessions = await this.egressClient.listEgress(data.roomId);
-    const activeSessions = sessions.filter(es =>
+    const sessions = await this.egressClient.listEgress(data.roomMetadata.room_id);
+    /**
+     *  We only stop first one we find if there are more
+     */
+    const egressSession = sessions.find(es =>
       es.status == EgressStatus.EGRESS_ACTIVE ||
       es.status == EgressStatus.EGRESS_STARTING)
-    for (const session of activeSessions) {
-      await this.stopEgressOrRetry(data, session);
+    if (!egressSession) {
+      this.logger.warn(`Tried to stop non existing or already stopped egress session for room ${data.roomMetadata.room_id}!`);
+      return;
     }
+    await this.stopEgressOrRetry(data, egressSession);
   }
   async startEgressRecording(data: StartEgressRecordingDto): Promise<boolean> {
-    const sessions = await this.egressClient.listEgress(data.roomId);
-
-    const activeSessions = sessions.filter(es => es.status == EgressStatus.EGRESS_ACTIVE);
+    const sessions = await this.egressClient.listEgress(data.roomMetadata.room_id);
+    // Check if any are active, starting or ending
+    const activeSessions = sessions.filter(es =>
+      es.status == EgressStatus.EGRESS_ACTIVE ||
+      es.status == EgressStatus.EGRESS_STARTING ||
+      es.status == EgressStatus.EGRESS_ENDING);
     if (activeSessions.length > 0)
     {
-      this.logger.error(`Room ${data.roomId} has ${activeSessions.length} active egress sessions!`);
+      this.logger.error(`Room ${data.roomMetadata.room_id} has ${activeSessions.length} active egress sessions!`);
       return false;
     }
     try {
       const result = await this.egressClient.startRoomCompositeEgress(
-        data.roomId,
+        data.roomMetadata.room_id,
         {
           fileType: EncodedFileType.MP4,
           filepath: `${this.recordingLocation}/{room_id}_{room_name}-{time}.mp4`,
@@ -85,15 +108,19 @@ export class LivekitEgressService {
           layout: 'grid-dark',
         },
       );
-      if (result.error) {
-        this.logger.error(`Failed to start egress session for room ${data.roomId}!`);
+      if (result.error || !result.egressId) {
+        this.logger.error(`Failed to start egress session for room ${data.roomMetadata.room_id}!`);
         return false;
       }
+      this.client.emit(START_OPENCAST_EVENT, <StartOpencastEventDto> {
+        roomMetadata: data.roomMetadata,
+        recorderId: data.recorderId,
+        type: OpencastIngestType.ROOM_COMPOSITE
+      });
       return true;
     } catch (e) {
-      this.logger.error(`Caught exception while starting ${data.roomId} room egress!\n${e}`);
+      this.logger.error(`Caught exception while starting ${data.roomMetadata.room_id} room egress!\n${e}`);
       return false;
     }
-    return false;
   }
 }

@@ -254,10 +254,12 @@ export class EpiphanService {
     }
 
     // 2. Create or get ingress stream key
-    const streamKeyCreateResponse = await firstValueFrom(this.client.send<ServiceMessageResponse<IngressInfo>, CreateOrGetIngressStreamKeyDto>(CREATE_OR_GET_INGRESS_STREAM_KEY, <CreateOrGetIngressStreamKeyDto>{
-      epiphanId: data.epiphanId,
-      roomId: data.roomId
-    }));
+    const streamKeyCreateResponse = await firstValueFrom(
+      this.client.send<ServiceMessageResponse<IngressInfo>, CreateOrGetIngressStreamKeyDto>(CREATE_OR_GET_INGRESS_STREAM_KEY, <CreateOrGetIngressStreamKeyDto>
+      {
+        epiphanId: data.epiphanId,
+        roomId: data.roomMetadata.room_id
+      }));
     success &&= streamKeyCreateResponse.success;
 
     // 3. Update RTMP livestream config
@@ -278,7 +280,7 @@ export class EpiphanService {
             username: '',
             password: '',
             auto_created: false,
-            name: `${data.roomTitle || "PlugNMeet Livestream"}`,
+            name: `${data.roomMetadata.room_title || "PlugNMeet Livestream"}`,
           }, { headers: headers }).pipe(
           map((response) => response.data),
           retryPolicy(),

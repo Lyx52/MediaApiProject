@@ -1,17 +1,14 @@
 import { IsEnum, IsNotEmpty, IsNumber, IsString } from "class-validator";
+import { ActiveRoomInfo } from "plugnmeet-sdk-js";
 
 export class DownloadJobDto {
-  @IsString()
   @IsNotEmpty()
-  readonly recorderId: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly roomSid: string;
+  readonly roomMetadata: ActiveRoomInfo;
   @IsString()
   @IsNotEmpty()
   readonly epiphanId: string;
-  @IsNumber()
+  @IsString()
   @IsNotEmpty()
-  readonly recordingPart: number;
+  readonly recorderId: string;
 }
 

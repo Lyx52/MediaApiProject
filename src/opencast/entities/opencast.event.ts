@@ -2,6 +2,7 @@ import { Column, Entity, ObjectID, ObjectIdColumn } from 'typeorm';
 import { CaptureAgentState } from "../dto/enums/CaptureAgentState";
 import { OpencastRecordingState } from "../dto/enums/OpencastRecordingState";
 import { IngestJobDto } from "../dto/IngestJobDto";
+import { OpencastIngestType } from "../dto/enums/OpencastIngestType";
 
 @Entity()
 export class OpencastEvent {
@@ -9,20 +10,17 @@ export class OpencastEvent {
   id: ObjectID;
 
   @Column()
-  name: string;
+  title: string;
 
   @Column()
   subject: string;
 
   @Column()
   location: string;
-
   @Column()
   eventId: string;
-
   @Column()
   seriesId: string;
-
   @Column()
   roomSid: string;
   @Column()
@@ -35,4 +33,6 @@ export class OpencastEvent {
   agentState: CaptureAgentState;
   @Column()
   recordingState: OpencastRecordingState;
+  @Column()
+  type: OpencastIngestType;
 }

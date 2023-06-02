@@ -87,10 +87,8 @@ export class EpiphanDownloadConsumer {
           this.logger.debug(`File downloaded successfully to ${uploadLocation}`);
           await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
             recorderId: job.data.recorderId,
-            roomSid: job.data.roomSid,
-            uri: uploadLocation,
-            type: OpencastIngestType.PRESENTER,
-            part: job.data.recordingPart
+            roomSid: job.data.roomMetadata.sid,
+            uri: uploadLocation
           });
           await job.moveToCompleted();
           return;

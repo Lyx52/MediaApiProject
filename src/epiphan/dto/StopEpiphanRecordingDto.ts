@@ -1,18 +1,15 @@
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsString } from "class-validator";
+import { ActiveRoomInfo } from "plugnmeet-sdk-js";
 
 export class StopEpiphanRecordingDto {
   @IsString()
   @IsNotEmpty()
-  readonly recorderId: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly roomSid: string;
-  @IsString()
-  @IsNotEmpty()
   readonly epiphanId: string;
-  @IsNumber()
+  @IsString()
   @IsNotEmpty()
-  readonly recordingPart: number;
+  readonly recorderId: string;
+  @IsNotEmpty()
+  readonly roomMetadata: ActiveRoomInfo;
   @IsBoolean()
   readonly ingestRecording: boolean;
 }

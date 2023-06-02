@@ -1,11 +1,11 @@
 import { IsEnum, IsNotEmpty, IsString } from "class-validator";
+import { ActiveRoomInfo } from "plugnmeet-sdk-js";
 
-export class IngestMediaPackageDto {
+export class IngestMediaPackageJobDto {
   @IsString()
   @IsNotEmpty()
   readonly roomSid: string;
-  @IsString()
   @IsNotEmpty()
-  readonly recorderId: string;
+  readonly roomMetadata: ActiveRoomInfo;
 }
 

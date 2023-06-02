@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
-import { CreateOpencastEventDto } from "../dto/CreateOpencastEventDto";
+import { StartOpencastEventDto } from "../dto/StartOpencastEventDto";
 import { ConfigService } from "@nestjs/config";
 import { firstValueFrom, map } from "rxjs";
 import { handleAxiosExceptions, retryPolicy } from "../../common/utils/axios.utils";
@@ -10,10 +10,11 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { FindOneAndReplaceOption, MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
 import { OpencastEvent } from "../entities/opencast.event";
-import { StartOpencastIngestDto } from "../dto/StartOpencastIngestDto";
+import { StopOpencastEventDto } from "../dto/StopOpencastEventDto";
 import { IngestJobDto } from "../dto/IngestJobDto";
 import * as fs from 'fs/promises';
 import { basename } from "path";
+import { toTitle } from "../dto/enums/OpencastIngestType";
 @Injectable()
 export class OpencastService implements OnModuleInit {
   private readonly logger: Logger = new Logger(OpencastService.name);
@@ -55,15 +56,6 @@ export class OpencastService implements OnModuleInit {
           }
         ], "public");
       }
-      //this.logger.debug(await this.createMediaPackageWithId("testId1111222"));
-      this.logger.debug(this.generateEventDublinCore(
-        "TestDC",
-        "Math",
-        "LBTU",
-        "test-series",
-        new Date(),
-        new Date()
-      ));
     } catch (e) {
       this.logger.error(`Error while initializing opencast service module \n  ${e}`);
     }
@@ -75,7 +67,7 @@ export class OpencastService implements OnModuleInit {
   async findEvent(whereStr: object): Promise<OpencastEvent> {
     return this.eventRepository.findOne({
       where: whereStr,
-      select: ['id', 'name', "agentState", "recorderId", "recordingState", "agentState", "roomSid", "eventId"],
+      select: ['id', 'title', "agentState", "recorderId", "recordingState", "agentState", "roomSid", "eventId"],
     });
   }
   async createMediaPackage() {
@@ -108,6 +100,21 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   }
+  async setEventSeries(eventId: string, seriesId: string) {
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
+    const params = new URLSearchParams();
+    params.set('eventId', eventId);
+    params.set('type', 'lbtu-wf-upload');
+    params.set('metadata', eventId);
+    return firstValueFrom(this.httpService.post(`${this.host}/api/events/${eventId}/metadata`, {}, {
+      headers: headers,
+      params: params
+    }).pipe(
+      map((response) => response.data.toString()),
+      retryPolicy(),
+      handleAxiosExceptions(),
+    ));
+  }
   async ingestRecordings(mediaPackage: string, eventId: string) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const params = new URLSearchParams();
@@ -131,7 +138,9 @@ export class OpencastService implements OnModuleInit {
     data.append('BODY1', new Blob([videoFile]), basename(uri));
     const headers = this.makeAuthHeader('multipart/form-data');
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/addTrack`, data, {
-      headers: headers
+      headers: headers,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
     }).pipe(
       map((response) => response.data.toString()),
       retryPolicy(),
@@ -301,12 +310,7 @@ export class OpencastService implements OnModuleInit {
   }
 
   private generateEventDublinCore(
-    title: string,
-    subject: string,
-    location: string,
-    series: string,
-    start: Date,
-    end: Date,
+    event: OpencastEvent,
     description = "",
     language = "lv",
     publisher = "LBTU",
@@ -315,17 +319,17 @@ export class OpencastService implements OnModuleInit {
   ) {
     return this.generateDublinCore(
       {
-        created: start,
+        created: event.start,
         temporal: {
-          start: start,
-          end: end,
+          start: event.start,
+          end: event.end,
           scheme: "W3C-DTF"
         },
-        isPartOf: series,
+        isPartOf: event.seriesId,
         language: language,
-        spatial: location,
-        title: title,
-        subject: subject,
+        spatial: event.location || "PlugNMeet Conference",
+        title: event.title,
+        subject: event.subject || "PlugNMeet Conference",
         description: description,
         publisher: publisher,
         creator: creator,
@@ -338,14 +342,7 @@ export class OpencastService implements OnModuleInit {
   async addDublinCore(event: OpencastEvent, mediaPackage: string) {
     const params = new URLSearchParams();
     params.set('mediaPackage', mediaPackage);
-    const dublinCore = this.generateEventDublinCore(
-      `${event.start.toLocaleDateString('lv-LV')} ${event.name} recording`,
-      event.subject || "PlugNMeet Conference",
-      event.location || "PlugNMeet Conference",
-      `${event.name} PlugNMeet recording`,
-      event.start,
-      event.end
-    );
+    const dublinCore = this.generateEventDublinCore(event);
     params.set('dublinCore', dublinCore);
     params.set('flavor', 'dublincore/episode');
 
@@ -367,7 +364,7 @@ export class OpencastService implements OnModuleInit {
     const params = new URLSearchParams();
     params.set('state', CaptureAgentState[state].toString().toLowerCase());
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
-    await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${event.recorderId}_${event.roomSid}_${event.name}`, {},{
+    await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${event.recorderId}`, {},{
       headers: headers,
       params: params
     }).pipe(
@@ -397,10 +394,10 @@ export class OpencastService implements OnModuleInit {
     const params = new URLSearchParams();
     params.set('start', event.start.getTime().toString());
     params.set('end', event.end.getTime().toString());
-    params.set('agent', `${event.recorderId}_${event.roomSid}_${event.name}`);
+    params.set('agent', event.recorderId);
     params.set('mediaPackage', mediaPackage);
     params.set('users', 'admin');
-    params.set('source', event.name);
+    params.set('source', event.title);
 
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     await firstValueFrom(this.httpService.post(`${this.host}/recordings/`, {},{
@@ -411,7 +408,7 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    const createdEvent: any = await this.getLastRecording(`${event.recorderId}_${event.roomSid}_${event.name}`);
+    const createdEvent: any = await this.getLastRecording(event.recorderId);
     event.eventId = createdEvent.id;
     return event;
   }
@@ -426,7 +423,6 @@ export class OpencastService implements OnModuleInit {
     ));
   };
   async removeOldScheduledRecordings(buffer = 60) {
-    return;
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const params = new URLSearchParams();
     params.set('buffer', buffer.toString());
@@ -531,10 +527,8 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   };
-  async startRecordingEvent(data: CreateOpencastEventDto) {
+  async startRecordingEvent(data: StartOpencastEventDto) {
     try {
-      // Remove old stopped recordings
-      await this.removeOldScheduledRecordings();
       let event = await this.createOrGetEvent(data);
       event = await this.setCaptureAgentState(event, CaptureAgentState.CAPTURING);
       event = await this.setRecordingEventState(event, OpencastRecordingState.CAPTURING);
@@ -544,7 +538,7 @@ export class OpencastService implements OnModuleInit {
     }
     // TODO: Maybe add some retry policy?
   };
-  async stopRecordingEvent(data: StartOpencastIngestDto): Promise<OpencastEvent> {
+  async stopRecordingEvent(data: StopOpencastEventDto): Promise<boolean> {
     let event = await this.eventRepository.findOne({
       where: { roomSid: data.roomSid, recorderId: data.recorderId },
       order: { start: 'DESC' }
@@ -552,7 +546,7 @@ export class OpencastService implements OnModuleInit {
     if (!event)
     {
       this.logger.error(`Event with recorder ${data.recorderId} dosn't exist!`);
-      return;
+      return false;
     }
     try {
       /**
@@ -565,19 +559,19 @@ export class OpencastService implements OnModuleInit {
       // Set end time as now
       event.end = new Date();
       await this.eventRepository.save(event);
-      return event;
+      return true;
     } catch (e) {
       this.logger.error(`Caught exception while stopping event: ${e}!`);
     }
   }
-  async createOrGetEvent(data: CreateOpencastEventDto): Promise<OpencastEvent> {
+  async createOrGetEvent(data: StartOpencastEventDto): Promise<OpencastEvent> {
     /**
      *  First we try to see if event exists AND if it already has eventId
      */
     let event = await this.eventRepository.findOne({
       where: {
+        roomSid: data.roomMetadata.sid,
         recorderId: data.recorderId,
-        roomSid: data.roomSid,
         eventId: {
           $ne: null,
           $exists: true
@@ -590,15 +584,16 @@ export class OpencastService implements OnModuleInit {
      */
     event = this.eventRepository.create();
     event.recorderId = data.recorderId;
-    event.name = data.name;
-    event.roomSid = data.roomSid;
+    event.type = data.type
+    event.roomSid = data.roomMetadata.sid;
     event.start = new Date();
     event.end = new Date();
+    event.title = `${data.roomMetadata.room_title} ${toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
     // End of recording is in one hour
     // TODO: Change this to one hour currently 60 sec
     event.end.setTime(event.start.getTime() + 60000);
-    const series: any = await this.createSeries(`${data.name} PlugNMeet recording`, data.name);
-    event.seriesId = series.identifier;
+    // Find if any event already has created series
+    event.seriesId = "";
     /**
      * Add capture agent if dosnt exist, set it to idle for now
      */
@@ -607,17 +602,18 @@ export class OpencastService implements OnModuleInit {
     /**
      *  Create MediaPackage and add DublinCore metadata to MediaPackage
      */
-    let mediaPackage = await this.createMediaPackageWithId(`${data.roomSid}_${data.recorderId}`);
+    let mediaPackage = await this.createMediaPackageWithId(`${data.roomMetadata.sid}_${data.recorderId}`);
     mediaPackage = await this.addDublinCore(event, <string>mediaPackage);
     /**
      * Create recording, if not already created
      */
+    await this.removeOldScheduledRecordings();
     event = await this.createRecordingEvent(event, <string>mediaPackage);
     /**
      *  Configure event
      */
     await this.setAccessListTemplate(event, 'public');
-    await this.setWorkflow(event, 'schedule-and-upload');
+    await this.setWorkflow(event, 'lbtu-wf-upload');
     return await this.eventRepository.save(event);
   };
   private makeAuthHeader(contentType = 'application/json') {

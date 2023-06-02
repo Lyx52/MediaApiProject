@@ -30,7 +30,7 @@ export class LivekitTaskService implements OnModuleInit{
    *  A cron job that every 1.5 minutes checks active/starting egress sessions and
    *  checks if they actually have conference rooms
    */
-  @Cron('30 1 * * * *')
+  @Cron('45 * * * * *')
   async syncEgressSessions()
   {
     const activeRooms = await this.PNMController.getActiveRoomsInfo();
@@ -40,7 +40,7 @@ export class LivekitTaskService implements OnModuleInit{
       es.status === EgressStatus.EGRESS_STARTING
     );
     for (const session of activeSessions) {
-      const room = activeRooms.rooms.find(r => r.room_info.room_id === session.roomId);
+      const room = activeRooms.rooms.find(r => r.room_info.sid === session.roomId);
       if (room && room.room_info.is_recording) continue;
       this.logger.warn(`Found active egress session ${session.egressId} without a conference room!`);
       await this.egressClient.stopEgress(session.egressId);
