@@ -258,7 +258,7 @@ export class EpiphanService {
       this.client.send<ServiceMessageResponse<IngressInfo>, CreateOrGetIngressStreamKeyDto>(CREATE_OR_GET_INGRESS_STREAM_KEY, <CreateOrGetIngressStreamKeyDto>
       {
         epiphanId: data.epiphanId,
-        roomId: data.roomMetadata.room_id
+        roomMetadata: data.roomMetadata
       }));
     success &&= streamKeyCreateResponse.success;
 

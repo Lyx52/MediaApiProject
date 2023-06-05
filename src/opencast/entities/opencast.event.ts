@@ -35,4 +35,6 @@ export class OpencastEvent {
   recordingState: OpencastRecordingState;
   @Column()
   type: OpencastIngestType;
+  @Column()
+  recordingPart: number;
 }

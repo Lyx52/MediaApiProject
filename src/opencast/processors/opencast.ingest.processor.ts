@@ -62,7 +62,7 @@ export class OpencastVideoIngestConsumer {
     this.logger.debug("Started INGEST_MEDIAPACKAGE_JOB");
 
     const events = await this.eventRepository.find({
-      where: { roomSid: job.data.roomSid }
+      where: { roomSid: job.data.roomMetadata.sid }
     });
     if (events.length <= 0)
     {
@@ -70,39 +70,50 @@ export class OpencastVideoIngestConsumer {
       await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because there are not recording events associated with conference!` });
       return;
     }
-    const series: any = await this.eventService.createSeries(`${job.data.roomMetadata.room_title} PlugNMeet Conference series`, `${job.data.roomMetadata.room_title}`);
-    for (const event of events) {
-      let watch: string;
-      try {
-        watch = await this.redisClient.watch(PLUGNMEET_RECORDER_INFO_KEY);
-        if (watch !== 'OK') {
-          await new Promise((res) => setTimeout(res, INGEST_JOB_RETRY));
-          await job.retry();
-          return;
-        }
-        /**
-         *  Get media package, it has version and xml data
-         */
-        let mediaPackageInfo: any = await this.redisClient.hget(EVENT_MEDIAPACKAGE_RESOURCE_KEY, event.eventId);
-        if (!mediaPackageInfo) {
-          this.logger.error(`INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!`);
-          await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!` });
-          return;
-        }
-        /**
-         * Ingest into event
-         */
-        mediaPackageInfo = JSON.parse(mediaPackageInfo);
-        await this.eventService.ingestRecordings(mediaPackageInfo.data, event.eventId);
-      } catch (e) {
-        this.logger.error(`Caught exception while processing a job ${e}`);
+    let watch: string;
+    try {
+      const series: any = await this.eventService.createSeries(`${job.data.roomMetadata.room_title} PlugNMeet Conference series`, `${job.data.roomMetadata.room_title}`);
+      watch = await this.redisClient.watch(PLUGNMEET_RECORDER_INFO_KEY);
+
+      if (watch !== 'OK')
+      {
+        await new Promise((res) => setTimeout(res, INGEST_JOB_RETRY));
         await job.retry();
-      } finally {
-        if (watch === 'OK') {
-          await this.redisClient.unwatch();
-        }
-        await job.moveToCompleted();
+        return;
       }
+      /**
+       *  Ingest all events
+       */
+      for (const event of events)
+      {
+          /**
+           *  Get media package, it has version and xml data
+           */
+          let mediaPackageInfo: any = await this.redisClient.hget(EVENT_MEDIAPACKAGE_RESOURCE_KEY, event.eventId);
+          if (!mediaPackageInfo)
+          {
+            this.logger.error(`INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!`);
+            await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!` });
+            return;
+          }
+          /**
+           * Ingest into event
+           */
+          mediaPackageInfo = JSON.parse(mediaPackageInfo);
+          await this.eventService.ingestRecordings(mediaPackageInfo.data, event.eventId);
+      }
+
+    } catch (e)
+    {
+      this.logger.error(`Caught exception while processing a job ${e}`);
+      await job.retry();
+    } finally
+    {
+      if (watch === 'OK')
+      {
+        await this.redisClient.unwatch();
+      }
+      await job.moveToCompleted();
     }
   }
   @Process(INGEST_VIDEO_JOB)
@@ -155,9 +166,9 @@ export class OpencastVideoIngestConsumer {
       /**
        *  We update the mediapackage on opencast side, part number is equal to current mediaPackageVersion because each event only ingests one type of video
        */
-      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri, `${event.type}-${mediaPackageInfo.version}`);
+      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri, `${event.type}-${event.recordingPart - 1}`);
       mediaPackageInfo.version += 1;
-      this.logger.debug(`Updating mediapackage for event ${event.eventId}, version ${mediaPackageInfo.version}, \nfile ${job.data.uri}, sourceType: ${event.type}-${mediaPackageInfo.version}!`);
+      this.logger.debug(`Updating mediapackage for event ${event.eventId}, version ${mediaPackageInfo.version}, \nfile ${job.data.uri}, sourceType: ${event.type}-${event.recordingPart - 1}!`);
       /**
        *  Then we update it from our side
        */

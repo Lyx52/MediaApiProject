@@ -35,9 +35,12 @@ export class LivekitTaskService implements OnModuleInit{
   {
     const activeRooms = await this.PNMController.getActiveRoomsInfo();
     const sessions = await this.egressClient.listEgress();
-    const activeSessions = sessions.filter(es =>
-      es.status === EgressStatus.EGRESS_ACTIVE ||
-      es.status === EgressStatus.EGRESS_STARTING
+    const activeSessions = sessions.filter((es) =>
+      (
+        es.status === EgressStatus.EGRESS_ACTIVE ||
+        es.status === EgressStatus.EGRESS_STARTING
+      ) &&
+      (Date.now() - es.startedAt) > 300000 // 5 Minutes
     );
     for (const session of activeSessions) {
       const room = activeRooms.rooms.find(r => r.room_info.sid === session.roomId);

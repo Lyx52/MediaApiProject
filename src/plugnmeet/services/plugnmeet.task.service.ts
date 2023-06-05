@@ -4,7 +4,12 @@ import Redis from "ioredis";
 import { InjectRepository } from "@nestjs/typeorm";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import { MongoRepository } from "typeorm";
-import { PLUGNMEET_RECORDER_INFO_KEY, PLUGNMEET_ROOM_ENDED, PLUGNMEET_SERVICE } from "src/app.constants";
+import {
+  PLUGNMEET_RECORDER_INFO_KEY,
+  PLUGNMEET_ROOM_ENDED,
+  PLUGNMEET_SERVICE, STOP_EPIPHAN_RECORDING,
+  STOP_LIVEKIT_EGRESS_RECORDING
+} from "src/app.constants";
 import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
 import { CronJob } from "cron";
 import { PlugNmeet } from "plugnmeet-sdk-js";
@@ -15,6 +20,8 @@ import { ClientProxy } from "@nestjs/microservices";
 import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
 import { util } from "protobufjs";
 import compareFieldsById = util.compareFieldsById;
+import { StopEgressRecordingDto } from "../../livekit/dto/StopEgressRecordingDto";
+import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
 
 @Injectable()
 export class PlugNMeetTaskService implements OnModuleInit {
@@ -48,9 +55,28 @@ export class PlugNMeetTaskService implements OnModuleInit {
         // Out of sync update
         if (room?.room_info) conference.metadata = room.room_info;
         conference.isActive = false;
+        /**
+         *   Stop egress recording
+         */
+        await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+          roomMetadata: conference.metadata,
+          ingestRecording: true,
+          recorderId: `${conference.recorderId}_ROOM_COMPOSITE_${conference.roomSid}`
+        });
+
+        /**
+         *   Stop epiphan recording if epiphanId is provided
+         */
+        if (conference.epiphanId) {
+          await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
+            roomMetadata: conference.metadata,
+            epiphanId: conference.epiphanId,
+            ingestRecording: true,
+            recorderId: `${conference.recorderId}_PRESENTER_${conference.roomSid}`
+          });
+        }
         this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-          roomId: conference.roomId,
-          roomSid: conference.roomSid
+          roomMetadata: conference.metadata
         });
         // Do some additional check if recorder is not "recording"
         const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId } });

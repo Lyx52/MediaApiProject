@@ -41,6 +41,7 @@ export class OpencastController {
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {
     this.logger.debug("PLUGNMEET_ROOM_ENDED");
+    await this.eventService.stopAllRecordingEvents(data);
     await this.ingestQueue.add(INGEST_MEDIAPACKAGE_JOB, <IngestMediaPackageJobDto>data);
   }
 }

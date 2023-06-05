@@ -1,11 +1,8 @@
 import { IsEnum, IsNotEmpty, IsString } from "class-validator";
+import { ActiveRoomInfo } from "plugnmeet-sdk-js";
 
 export class PlugNMeetRoomEndedDto {
-  @IsString()
   @IsNotEmpty()
-  readonly roomSid: string;
-  @IsString()
-  @IsNotEmpty()
-  readonly roomId: string;
+  readonly roomMetadata: ActiveRoomInfo;
 }
 

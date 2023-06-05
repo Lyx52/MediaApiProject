@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   ADD_OPENCAST_INGEST_JOB,
+  LIVEKIT_EGRESS_SERVICE,
   START_OPENCAST_EVENT,
-  INGEST_VIDEO_JOB,
-  LIVEKIT_EGRESS_SERVICE, STOP_OPENCAST_EVENT
+  STOP_OPENCAST_EVENT
 } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { EgressClient, EgressInfo, EncodedFileType, EncodingOptionsPreset } from "livekit-server-sdk";
@@ -41,6 +41,8 @@ export class LivekitEgressService {
       const info = await this.egressClient.stopEgress(session.egressId);
       const files = info.fileResults;
       // Ingest only from active sessions, ignore starting sessions
+      // TODO: REMOVE THIS
+      session.status = EgressStatus.EGRESS_ACTIVE;
       if (files && data.ingestRecording && session.status == EgressStatus.EGRESS_ACTIVE) {
 
         // We send a message and wait for answer
