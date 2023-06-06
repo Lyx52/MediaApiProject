@@ -22,39 +22,10 @@ import { existsSync } from "fs";
 @Processor('video')
 export class OpencastVideoIngestConsumer {
   private readonly logger: Logger = new Logger(OpencastVideoIngestConsumer.name);
-  private redlock: Redlock;
   constructor(
     private readonly eventService: OpencastService,
-    @InjectRedis() private readonly redisClient: Redis,
     @InjectRepository(OpencastEvent) private readonly eventRepository: MongoRepository<OpencastEvent>
   ) {
-    this.redlock = new Redlock([this.redisClient], {
-      retryCount: 250,
-      retryDelay: 200,
-      driftFactor: 0.01,
-      retryJitter: 200,
-    });
-  }
-  @OnQueueActive()
-  async onQueueActive(job: Job) {
-    if (job.name === INGEST_MEDIAPACKAGE_JOB) {
-      const { roomSid } = job.data;
-      const activeVideoJobs = await job.queue.getJobs(['active', 'paused', 'waiting', 'delayed']);
-      const videoJobsToWaitFor = activeVideoJobs.filter(
-        (j: Job<IngestJobDto>) => j && (j.name === INGEST_VIDEO_JOB && j.data.roomSid === roomSid)
-      );
-      if (videoJobsToWaitFor.length > 0) {
-        job.queue.on('completed', async (eventJob) => {
-          if (
-            eventJob.name === INGEST_VIDEO_JOB &&
-            eventJob.data.roomSid === roomSid &&
-            videoJobsToWaitFor.includes(eventJob)
-          ) {
-            await job.retry();
-          }
-        });
-      }
-    }
   }
 
   @Process(INGEST_MEDIAPACKAGE_JOB)
@@ -70,122 +41,33 @@ export class OpencastVideoIngestConsumer {
       await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because there are not recording events associated with conference!` });
       return;
     }
-    let watch: string;
     try {
-      const series: any = await this.eventService.createSeries(`${job.data.roomMetadata.room_title} PlugNMeet Conference series`, `${job.data.roomMetadata.room_title}`);
-      watch = await this.redisClient.watch(PLUGNMEET_RECORDER_INFO_KEY);
 
-      if (watch !== 'OK')
-      {
-        await new Promise((res) => setTimeout(res, INGEST_JOB_RETRY));
-        await job.retry();
-        return;
-      }
+      const series: any = await this.eventService.createSeries(`${job.data.roomMetadata.room_title} PlugNMeet Conference series`, `${job.data.roomMetadata.room_title}`);
       /**
        *  Ingest all events
        */
       for (const event of events)
       {
-          /**
-           *  Get media package, it has version and xml data
-           */
-          let mediaPackageInfo: any = await this.redisClient.hget(EVENT_MEDIAPACKAGE_RESOURCE_KEY, event.eventId);
-          if (!mediaPackageInfo)
-          {
-            this.logger.error(`INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!`);
-            await job.moveToFailed({ message: `INGEST_MEDIAPACKAGE_JOB failed because mediapackage does not exist!` });
-            return;
+        let mediaPackage = <string>await this.eventService.getMediaPackageByEventId(event.eventId);
+        if (event.jobs) {
+          const jobs = event.jobs.sort((a, b) => a.ingested - b.ingested);
+          let videoPart = 0;
+          for (const job of jobs) {
+            if (!existsSync(job.uri)) {
+              this.logger.warn(`File ${job.uri} does not exist! Wont be ingesting!`);
+              continue;
+            }
+            mediaPackage = <string>await this.eventService.addTrackFileFromFs(mediaPackage, job.uri, `${event.type}-${videoPart++}`);
           }
-          /**
-           * Ingest into event
-           */
-          mediaPackageInfo = JSON.parse(mediaPackageInfo);
-          await this.eventService.ingestRecordings(mediaPackageInfo.data, event.eventId);
+        }
+        await this.eventService.ingestRecordings(mediaPackage, event.eventId);
       }
-
+      await job.moveToCompleted();
     } catch (e)
     {
       this.logger.error(`Caught exception while processing a job ${e}`);
       await job.retry();
-    } finally
-    {
-      if (watch === 'OK')
-      {
-        await this.redisClient.unwatch();
-      }
-      await job.moveToCompleted();
-    }
-  }
-  @Process(INGEST_VIDEO_JOB)
-  async ingestVideoFile(job: Job<IngestJobDto>) {
-    this.logger.debug("Started INGEST_VIDEO_JOB");
-
-    if (!existsSync(job.data.uri)) {
-      this.logger.error(`INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!`);
-      await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because file ${job.data.uri} does not exist!` });
-      return;
-    }
-    const event = await this.eventRepository.findOne({
-      where: { roomSid: job.data.roomSid, recorderId: job.data.recorderId }
-    });
-    if (!event || !event.eventId)
-    {
-      this.logger.error(`INGEST_VIDEO_JOB failed because event does not exist or is not created!`);
-      await job.moveToFailed({ message: `INGEST_VIDEO_JOB failed because event does not exist or is not created!` });
-      return;
-    }
-    const resourceKey = `${EVENT_MEDIAPACKAGE_RESOURCE_KEY}:${event.eventId}`;
-    const lock: RLock = await this.redlock.acquire([resourceKey], MEDIAPACKAGE_LOCK_TTL);
-    let watch: string;
-    try {
-      watch = await this.redisClient.watch(PLUGNMEET_RECORDER_INFO_KEY);
-      if (watch !== 'OK') {
-        await new Promise((res) => setTimeout(res, 1000));
-        await job.retry();
-        return;
-      }
-      /**
-       *  Get media package, it has version and xml data
-       */
-      const testMp = await this.eventService.getMediaPackageByEventId(event.eventId);
-      let mediaPackageInfo: any = await this.redisClient.hget(EVENT_MEDIAPACKAGE_RESOURCE_KEY, event.eventId);
-      // Media package does not exist, create one
-      if (!mediaPackageInfo)
-      {
-        const mediaPackage = <string>await this.eventService.getMediaPackageByEventId(event.eventId);
-        mediaPackageInfo = {
-          version: 0,
-          data: mediaPackage
-        }
-        this.logger.debug(`Created mediapackage for event ${event.eventId}!`);
-      } else {
-        mediaPackageInfo = JSON.parse(mediaPackageInfo);
-      }
-
-      const redisChain = this.redisClient.multi({ pipeline: true });
-      /**
-       *  We update the mediapackage on opencast side, part number is equal to current mediaPackageVersion because each event only ingests one type of video
-       */
-      mediaPackageInfo.data = <string>await this.eventService.addTrackFileFromFs(mediaPackageInfo.data, job.data.uri, `${event.type}-${event.recordingPart - 1}`);
-      mediaPackageInfo.version += 1;
-      this.logger.debug(`Updating mediapackage for event ${event.eventId}, version ${mediaPackageInfo.version}, \nfile ${job.data.uri}, sourceType: ${event.type}-${event.recordingPart - 1}!`);
-      /**
-       *  Then we update it from our side
-       */
-      const payload = {}
-      payload[event.eventId] = JSON.stringify(mediaPackageInfo);
-      await redisChain.hset(EVENT_MEDIAPACKAGE_RESOURCE_KEY, payload);
-      await redisChain.exec();
-      await this.redisClient.unwatch();
-    } catch (e) {
-      this.logger.error(`Caught exception while processing a job ${e}`);
-      await job.retry();
-    } finally {
-      if (watch === 'OK') {
-        await this.redisClient.unwatch();
-      }
-      await lock.release();
-      await job.moveToCompleted();
     }
   }
 }

@@ -36,7 +36,7 @@ export class OpencastController {
   @EventPattern(ADD_OPENCAST_INGEST_JOB)
   async addIngestJob(@Body() data: IngestJobDto) {
     this.logger.debug("ADD_OPENCAST_INGEST_JOB");
-    await this.ingestQueue.add(INGEST_VIDEO_JOB, data);
+    await this.eventService.addIngestJob(data);
   }
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {

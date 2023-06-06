@@ -555,6 +555,12 @@ export class OpencastService implements OnModuleInit {
     }
     // TODO: Maybe add some retry policy?
   };
+  async addIngestJob(job: IngestJobDto) {
+    await this.eventRepository.updateOne(
+    { roomSid: job.roomSid, recorderId: job.recorderId },
+    { $push: { jobs: job } }
+    );
+  }
   async stopAllRecordingEvents(data: PlugNMeetRoomEndedDto): Promise<void> {
     const events = await this.eventRepository.find({
       where: { roomSid: data.roomMetadata.sid }
@@ -607,7 +613,6 @@ export class OpencastService implements OnModuleInit {
       event = await this.setRecordingEventState(event, OpencastRecordingState.UPLOADING);
       event.end = new Date();
       await this.updateEventScheduling(event);
-      event.recordingPart++;
       await this.eventRepository.save(event);
       return true;
     } catch (e) {
@@ -658,11 +663,10 @@ export class OpencastService implements OnModuleInit {
     event.roomSid = data.roomMetadata.sid;
     event.start = new Date();
     event.end = new Date();
-    event.recordingPart = 0;
+    event.jobs = [];
     event.title = `${data.roomMetadata.room_title} ${toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
-    // End of recording is in half an hour
-    event.end.setTime(event.start.getTime() + 60000*30);
-    // Find if any event already has created series
+    // 60 minutes
+    event.end.setTime(event.start.getTime() + 60000 * 60);
     event.seriesId = "";
     /**
      * Add capture agent if dosnt exist, set it to idle for now

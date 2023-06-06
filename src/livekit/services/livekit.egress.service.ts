@@ -41,8 +41,6 @@ export class LivekitEgressService {
       const info = await this.egressClient.stopEgress(session.egressId);
       const files = info.fileResults;
       // Ingest only from active sessions, ignore starting sessions
-      // TODO: REMOVE THIS
-      session.status = EgressStatus.EGRESS_ACTIVE;
       if (files && data.ingestRecording && session.status == EgressStatus.EGRESS_ACTIVE) {
 
         // We send a message and wait for answer
@@ -57,7 +55,8 @@ export class LivekitEgressService {
               roomSid: data.roomMetadata.sid,
               //uri: `${this.recordingLocation}/${file.filename}`,
               uri: './sample-10s.mp4',
-              type: OpencastIngestType.ROOM_COMPOSITE
+              type: OpencastIngestType.ROOM_COMPOSITE,
+              ingested: Date.now()
             });
           }
         }

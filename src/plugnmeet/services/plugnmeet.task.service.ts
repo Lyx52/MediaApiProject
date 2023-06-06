@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { Cron, SchedulerRegistry } from "@nestjs/schedule";
+import { Cron, CronExpression, SchedulerRegistry } from "@nestjs/schedule";
 import Redis from "ioredis";
 import { InjectRepository } from "@nestjs/typeorm";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
@@ -43,7 +43,7 @@ export class PlugNMeetTaskService implements OnModuleInit {
     );
   }
 
-  @Cron('30 * * * * *')
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async syncRoomState()
   {
     const activeRooms = await this.PNMController.getActiveRoomsInfo();

@@ -88,7 +88,8 @@ export class EpiphanDownloadConsumer {
           await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
             recorderId: job.data.recorderId,
             roomSid: job.data.roomMetadata.sid,
-            uri: uploadLocation
+            uri: uploadLocation,
+            ingested: Date.now()
           });
           await job.moveToCompleted();
           return;

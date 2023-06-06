@@ -35,6 +35,7 @@ export class OpencastEvent {
   recordingState: OpencastRecordingState;
   @Column()
   type: OpencastIngestType;
-  @Column()
-  recordingPart: number;
+
+  @Column('json', { nullable: false })
+  jobs: IngestJobDto[];
 }

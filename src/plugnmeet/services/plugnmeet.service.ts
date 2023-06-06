@@ -161,7 +161,6 @@ export class PlugNMeetService implements OnModuleInit {
   async startRecording(payload: PlugNMeetToRecorder) {
     let conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
     const recorder = await this.recorderRepository.findOne({ where: { isRecording: { $in: [ false, 0 ]} } });
-    const allrecorder = await this.recorderRepository.find();
     if (!recorder) {
       this.logger.error(`There are no recorders available!`);
       await this.httpService.sendErrorMessage(payload);
@@ -174,8 +173,8 @@ export class PlugNMeetService implements OnModuleInit {
        *  It won't have epiphan device recordings!
        */
       conference = this.conferenceRepository.create();
-      conference.epiphanId = "LBTU_EPIPHAN_112"; // TODO: Remove this!!!!
-      //conference.epiphanId = null;
+      //conference.epiphanId = "LBTU_EPIPHAN_112"; // TODO: Remove this!!!!
+      conference.epiphanId = null;
       conference.recorderId = recorder.recorderId;
       conference.roomId = payload.roomId;
       conference.roomSid = payload.roomSid;
