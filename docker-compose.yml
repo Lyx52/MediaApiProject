@@ -1,9 +1,14 @@
-version: "3"
-
+version: "3.9"
 services:
-  mongodb:
-    image: mongo:6.0
-    environment:
-      - MONGODB_DATABASE="LbtuMediaDb"
+  mongo:
+    image: mongo:latest
+    restart: always
+  webapi:
+    container_name: 'lbtu-media-api'
+    restart: always
+    build: .
+    volumes:
+      - ./recordings:/app/recording_files
+      - ./config.yaml:/app/config.yaml:ro
     ports:
-      - "27017:27017"
+      - "9090:9090"

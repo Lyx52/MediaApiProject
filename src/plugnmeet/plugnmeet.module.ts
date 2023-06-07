@@ -9,7 +9,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Recorder } from "./entities/Recorder";
 import { RedisModule } from "@liaoliaots/nestjs-redis";
 import { HttpModule } from "@nestjs/axios";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import config from '../common/utils/config.yaml';
 import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
 import { ConferenceSession } from "./entities/ConferenceSession";
@@ -18,15 +18,19 @@ import { ConferenceSession } from "./entities/ConferenceSession";
     TypeOrmModule.forFeature([Recorder, ConferenceSession]),
     ClientsModule.register([{ name: PLUGNMEET_SERVICE, transport: Transport.TCP }]),
     ScheduleModule.forRoot(),
-    RedisModule.forRoot({
-      readyLog: true,
-      config: {
-        host: '85.254.205.116',
-        port: 6379,
-        username: '',
-        password: '',
-        db: 0,
-      },
+    RedisModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (config: ConfigService) => ({
+        readyLog: true,
+        config: {
+          host: config.getOrThrow<string>('redis.host'),
+          port: config.getOrThrow<number>('redis.port'),
+          db: config.getOrThrow<number>('redis.db'),
+          username: config.getOrThrow<string>('redis.username'),
+          password: config.getOrThrow<string>('redis.password')
+        },
+      }),
+      inject: [ConfigService],
     }),
     HttpModule.register({
       timeout: 5000,

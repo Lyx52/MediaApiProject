@@ -125,7 +125,7 @@ export class PlugNMeetService implements OnModuleInit {
       /**
        *  Add missing recorders if count has increased
        */
-      if ((i + 1) > recorderCount) {
+      if ((i + 1) > recorders.length) {
         const recorder = this.recorderRepository.create();
         recorder.isRecording = false;
         recorder.recorderId = this.makeRecorderId(16);

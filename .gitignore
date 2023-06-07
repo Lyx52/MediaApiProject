@@ -23,5 +23,8 @@ npm-debug.log
 /dist
 ./dist
 dist
+/testz
 /config.yaml
+/config-dev.yaml
 sample-10s.mp4
+prod.env

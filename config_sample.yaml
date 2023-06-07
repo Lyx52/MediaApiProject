@@ -22,6 +22,10 @@ opencast:
   host: OPENCAST_HOSTNAME
   username: OPENCAST_USERNAME
   password: OPENCAST_PASSWORD
+mongodb:
+  host: MONGODB_HOST
+  database: MONGODB_DATABASE
+  port: MONGODB_PORT
 epiphan_config:
   - name: DEVICE_NAME_0
     identifier: DEVICE_IDENTIFIER_0
