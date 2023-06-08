@@ -5,11 +5,11 @@ import {
 } from "../app.constants";
 import {ClientProxy, Ctx, EventPattern, MessagePattern, Payload} from "@nestjs/microservices";
 import { PlugNMeetService } from "./services/plugnmeet.service";
-import { PlugNMeetToRecorder, RecordingTasks } from "../proto/plugnmeet_recorder_pb";
 import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
 import { CreateConferenceRoom } from "./dto/CreateConferenceRoom";
 import { CreateRoomResponse } from "plugnmeet-sdk-js";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
+import { PlugNMeetToRecorder, RecordingTasks } from "src/proto/plugnmeet_recorder_pb";
 
 @Controller('plugnmeet')
 export class PlugNMeetController {
@@ -25,6 +25,7 @@ export class PlugNMeetController {
   async createConferenceRoom(@Body() payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
     return await this.pnmService.createConferenceRoom(payload);
   }
+
   @EventPattern(LIVEKIT_WEBHOOK_EVENT)
   async handleLivekitWebhookEvents(@Body() data: WebhookEvent) {
     try {
@@ -37,6 +38,7 @@ export class PlugNMeetController {
       this.logger.error(`Caught unhandled exception!\n${e}`);
     }
   }
+
   @MessagePattern('plug-n-meet-recorder')
   async handlePlugNMeetMessage(@Payload() payload: PlugNMeetToRecorder) {
     if (payload.from !== 'plugnmeet') return;

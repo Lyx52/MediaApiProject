@@ -36,31 +36,36 @@ export class LivekitEgressService {
     );
     this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
   }
+
+  async ingestEgress(session: EgressInfo, roomSid: string, recorderId: string) {
+    const files = session.fileResults;
+
+    // Ingest only from active sessions, ignore starting sessions
+    if (files) {
+      // We send a message and wait for answer
+      if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
+        roomSid: roomSid,
+        recorderId: recorderId,
+      }))) {
+        // Add each file to opencast queue
+        for (const file of files) {
+          // File is less than 5mb or less than 30 seconds long, skip.
+          if (file.size < 5_000 || file.duration < 30) continue;
+          await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
+            recorderId: recorderId,
+            roomSid: roomSid,
+            uri: path.resolve(file.filename),
+            type: OpencastIngestType.ROOM_COMPOSITE,
+            ingested: Date.now()
+          });
+        }
+      }
+    }
+  }
+
   async stopEgressOrRetry(data: StopEgressRecordingDto, session: EgressInfo, retries= 0) {
     try {
-      const info = await this.egressClient.stopEgress(session.egressId);
-      const files = info.fileResults;
-      // Ingest only from active sessions, ignore starting sessions
-      if (files && data.ingestRecording && session.status == EgressStatus.EGRESS_ACTIVE) {
-
-        // We send a message and wait for answer
-        if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
-          roomSid: data.roomMetadata.info.sid,
-          recorderId: data.recorderId,
-        }))) {
-          // Add each file to opencast queue
-          for (const file of files) {
-            await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
-              recorderId: data.recorderId,
-              roomSid: data.roomMetadata.info.sid,
-              uri: path.resolve(file.filename),
-              type: OpencastIngestType.ROOM_COMPOSITE,
-              ingested: Date.now()
-            });
-          }
-        }
-
-      }
+      await this.egressClient.stopEgress(session.egressId);
     } catch (e) {
       this.logger.error(`Failed to stop egress ${session.egressId}!`);
       if (retries <= 3) {

@@ -15,7 +15,7 @@ import { CreateOrGetIngressStreamKeyDto } from "./dto/CreateOrGetIngressStreamKe
 import { PlugNMeetRoomEndedDto } from "../plugnmeet/dto/PlugNMeetRoomEndedDto";
 import {ConfigService} from "@nestjs/config";
 import {EgressClient, WebhookReceiver} from "livekit-server-sdk";
-import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
+import { WebhookEvent } from "livekit-server-sdk/dist/proto/livekit_webhook";
 @Controller('livekit')
 export class LivekitController {
   private readonly logger: Logger = new Logger(LivekitController.name);
@@ -31,6 +31,18 @@ export class LivekitController {
         this.config.getOrThrow<string>("livekit.secret"),
     );
   }
+  @EventPattern(LIVEKIT_WEBHOOK_EVENT)
+  async handleLivekitWebhookEvents(@Body() data: WebhookEvent) {
+    try {
+      switch(data.event) {
+        case "egress_ended":
+          await this.egressService.ingestEgress(data.egressInfo, data.egressInfo.roomId, `ROOM_COMPOSITE_${data.egressInfo.roomId}`);
+          break;
+      }
+    } catch (e) {
+      this.logger.error(`Caught unhandled exception!\n${e}`);
+    }
+  }
 
   @Post('webhook')
   @Header('content-type', 'application/webhook+json')
@@ -40,6 +52,7 @@ export class LivekitController {
       // Filter only events we want to send so there's fewer events thrown around
       switch(webhookEvent.event) {
         case "room_finished":
+        case "egress_ended":
           this.client.emit(LIVEKIT_WEBHOOK_EVENT, <WebhookEvent>webhookEvent);
           break;
       }
@@ -47,6 +60,7 @@ export class LivekitController {
       this.logger.warn(`Failed to handle webhook event from livekit!\n${e}`);
     }
   }
+
   @MessagePattern(START_LIVEKIT_EGRESS_RECORDING)
   async startEgressRecording(@Body() data: StartEgressRecordingDto) {
     this.logger.debug("START_LIVEKIT_EGRESS_RECORDING");

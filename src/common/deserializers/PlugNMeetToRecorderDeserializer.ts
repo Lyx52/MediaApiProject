@@ -1,5 +1,5 @@
 import { Deserializer, IncomingEvent, IncomingRequest } from "@nestjs/microservices";
-import { PlugNMeetToRecorder } from "../../proto/plugnmeet_recorder_pb";
+import { PlugNMeetToRecorder } from "src/proto/plugnmeet_recorder_pb";
 import { IncomingRequestDeserializer } from "@nestjs/microservices/deserializers";
 import shared_utils_1, { isUndefined } from "@nestjs/common/utils/shared.utils";
 export class PlugNMeetToRecorderDeserializer implements IncomingRequestDeserializer

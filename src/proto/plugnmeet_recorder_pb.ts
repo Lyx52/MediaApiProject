@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialMessage, PlainMessage } from "@bufbuild/protobuf";
-import { Message, proto3 } from "@bufbuild/protobuf";
+import { Message, proto3, protoInt64 } from "@bufbuild/protobuf";
 
 /**
  * @generated from enum plugnmeet.RecordingTasks
@@ -97,9 +97,9 @@ export class PlugNMeetToRecorder extends Message<PlugNMeetToRecorder> {
   task = RecordingTasks.START_RECORDING;
 
   /**
-   * @generated from field: string room_id = 3;
+   * @generated from field: int64 room_table_id = 3;
    */
-  roomId = "";
+  roomTableId = protoInt64.zero;
 
   /**
    * @generated from field: string room_sid = 4;
@@ -136,7 +136,7 @@ export class PlugNMeetToRecorder extends Message<PlugNMeetToRecorder> {
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "from", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "task", kind: "enum", T: proto3.getEnumType(RecordingTasks) },
-    { no: 3, name: "room_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "room_table_id", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
     { no: 4, name: "room_sid", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 5, name: "recording_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 6, name: "recorder_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
@@ -191,6 +191,11 @@ export class RecorderToPlugNMeet extends Message<RecorderToPlugNMeet> {
   recordingId = "";
 
   /**
+   * @generated from field: int64 room_table_id = 11;
+   */
+  roomTableId = protoInt64.zero;
+
+  /**
    * @generated from field: string room_id = 6;
    */
   roomId = "";
@@ -211,6 +216,8 @@ export class RecorderToPlugNMeet extends Message<RecorderToPlugNMeet> {
   filePath = "";
 
   /**
+   * next key 12
+   *
    * @generated from field: float file_size = 10;
    */
   fileSize = 0;
@@ -228,6 +235,7 @@ export class RecorderToPlugNMeet extends Message<RecorderToPlugNMeet> {
     { no: 3, name: "status", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
     { no: 4, name: "msg", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 5, name: "recording_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 11, name: "room_table_id", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
     { no: 6, name: "room_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 7, name: "room_sid", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 8, name: "recorder_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
@@ -249,6 +257,311 @@ export class RecorderToPlugNMeet extends Message<RecorderToPlugNMeet> {
 
   static equals(a: RecorderToPlugNMeet | PlainMessage<RecorderToPlugNMeet> | undefined, b: RecorderToPlugNMeet | PlainMessage<RecorderToPlugNMeet> | undefined): boolean {
     return proto3.util.equals(RecorderToPlugNMeet, a, b);
+  }
+}
+
+/**
+ * @generated from message plugnmeet.FromParentToChild
+ */
+export class FromParentToChild extends Message<FromParentToChild> {
+  /**
+   * @generated from field: plugnmeet.RecordingTasks task = 1;
+   */
+  task = RecordingTasks.START_RECORDING;
+
+  /**
+   * @generated from field: string recording_id = 2;
+   */
+  recordingId = "";
+
+  /**
+   * @generated from field: int64 room_table_id = 3;
+   */
+  roomTableId = protoInt64.zero;
+
+  constructor(data?: PartialMessage<FromParentToChild>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "plugnmeet.FromParentToChild";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "task", kind: "enum", T: proto3.getEnumType(RecordingTasks) },
+    { no: 2, name: "recording_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "room_table_id", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): FromParentToChild {
+    return new FromParentToChild().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): FromParentToChild {
+    return new FromParentToChild().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): FromParentToChild {
+    return new FromParentToChild().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: FromParentToChild | PlainMessage<FromParentToChild> | undefined, b: FromParentToChild | PlainMessage<FromParentToChild> | undefined): boolean {
+    return proto3.util.equals(FromParentToChild, a, b);
+  }
+}
+
+/**
+ * @generated from message plugnmeet.FromChildToParent
+ */
+export class FromChildToParent extends Message<FromChildToParent> {
+  /**
+   * @generated from field: plugnmeet.RecordingTasks task = 1;
+   */
+  task = RecordingTasks.START_RECORDING;
+
+  /**
+   * @generated from field: bool status = 2;
+   */
+  status = false;
+
+  /**
+   * @generated from field: string msg = 3;
+   */
+  msg = "";
+
+  /**
+   * @generated from field: string recording_id = 4;
+   */
+  recordingId = "";
+
+  /**
+   * @generated from field: int64 room_table_id = 5;
+   */
+  roomTableId = protoInt64.zero;
+
+  constructor(data?: PartialMessage<FromChildToParent>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "plugnmeet.FromChildToParent";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "task", kind: "enum", T: proto3.getEnumType(RecordingTasks) },
+    { no: 2, name: "status", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 3, name: "msg", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "recording_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "room_table_id", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): FromChildToParent {
+    return new FromChildToParent().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): FromChildToParent {
+    return new FromChildToParent().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): FromChildToParent {
+    return new FromChildToParent().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: FromChildToParent | PlainMessage<FromChildToParent> | undefined, b: FromChildToParent | PlainMessage<FromChildToParent> | undefined): boolean {
+    return proto3.util.equals(FromChildToParent, a, b);
+  }
+}
+
+/**
+ * @generated from message plugnmeet.StartRecorderChildArgs
+ */
+export class StartRecorderChildArgs extends Message<StartRecorderChildArgs> {
+  /**
+   * @generated from field: int64 room_table_id = 1;
+   */
+  roomTableId = protoInt64.zero;
+
+  /**
+   * @generated from field: string recording_id = 2;
+   */
+  recordingId = "";
+
+  /**
+   * @generated from field: string access_token = 4;
+   */
+  accessToken = "";
+
+  /**
+   * @generated from field: plugnmeet.PlugNMeetInfo plug_n_meet_info = 5;
+   */
+  plugNMeetInfo?: PlugNMeetInfo;
+
+  /**
+   * @generated from field: bool post_mp4_convert = 6;
+   */
+  postMp4Convert = false;
+
+  /**
+   * @generated from field: plugnmeet.CopyToPath copy_to_path = 7;
+   */
+  copyToPath?: CopyToPath;
+
+  /**
+   * @generated from field: plugnmeet.RecorderServiceType serviceType = 8;
+   */
+  serviceType = RecorderServiceType.RECORDING;
+
+  /**
+   * @generated from field: optional string recorder_id = 9;
+   */
+  recorderId?: string;
+
+  /**
+   * @generated from field: optional string rtmp_url = 10;
+   */
+  rtmpUrl?: string;
+
+  /**
+   * @generated from field: string websocket_url = 11;
+   */
+  websocketUrl = "";
+
+  /**
+   * @generated from field: optional string custom_chrome_path = 12;
+   */
+  customChromePath?: string;
+
+  constructor(data?: PartialMessage<StartRecorderChildArgs>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "plugnmeet.StartRecorderChildArgs";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "room_table_id", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 2, name: "recording_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "access_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "plug_n_meet_info", kind: "message", T: PlugNMeetInfo },
+    { no: 6, name: "post_mp4_convert", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 7, name: "copy_to_path", kind: "message", T: CopyToPath },
+    { no: 8, name: "serviceType", kind: "enum", T: proto3.getEnumType(RecorderServiceType) },
+    { no: 9, name: "recorder_id", kind: "scalar", T: 9 /* ScalarType.STRING */, opt: true },
+    { no: 10, name: "rtmp_url", kind: "scalar", T: 9 /* ScalarType.STRING */, opt: true },
+    { no: 11, name: "websocket_url", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 12, name: "custom_chrome_path", kind: "scalar", T: 9 /* ScalarType.STRING */, opt: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): StartRecorderChildArgs {
+    return new StartRecorderChildArgs().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): StartRecorderChildArgs {
+    return new StartRecorderChildArgs().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): StartRecorderChildArgs {
+    return new StartRecorderChildArgs().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: StartRecorderChildArgs | PlainMessage<StartRecorderChildArgs> | undefined, b: StartRecorderChildArgs | PlainMessage<StartRecorderChildArgs> | undefined): boolean {
+    return proto3.util.equals(StartRecorderChildArgs, a, b);
+  }
+}
+
+/**
+ * @generated from message plugnmeet.PlugNMeetInfo
+ */
+export class PlugNMeetInfo extends Message<PlugNMeetInfo> {
+  /**
+   * @generated from field: string host = 1;
+   */
+  host = "";
+
+  /**
+   * @generated from field: string api_key = 2;
+   */
+  apiKey = "";
+
+  /**
+   * @generated from field: string api_secret = 3;
+   */
+  apiSecret = "";
+
+  /**
+   * @generated from field: optional string join_host = 4;
+   */
+  joinHost?: string;
+
+  constructor(data?: PartialMessage<PlugNMeetInfo>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "plugnmeet.PlugNMeetInfo";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "host", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "api_key", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "api_secret", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "join_host", kind: "scalar", T: 9 /* ScalarType.STRING */, opt: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): PlugNMeetInfo {
+    return new PlugNMeetInfo().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): PlugNMeetInfo {
+    return new PlugNMeetInfo().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): PlugNMeetInfo {
+    return new PlugNMeetInfo().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: PlugNMeetInfo | PlainMessage<PlugNMeetInfo> | undefined, b: PlugNMeetInfo | PlainMessage<PlugNMeetInfo> | undefined): boolean {
+    return proto3.util.equals(PlugNMeetInfo, a, b);
+  }
+}
+
+/**
+ * @generated from message plugnmeet.CopyToPath
+ */
+export class CopyToPath extends Message<CopyToPath> {
+  /**
+   * @generated from field: string main_path = 1;
+   */
+  mainPath = "";
+
+  /**
+   * @generated from field: optional string sub_path = 2;
+   */
+  subPath?: string;
+
+  constructor(data?: PartialMessage<CopyToPath>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "plugnmeet.CopyToPath";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "main_path", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "sub_path", kind: "scalar", T: 9 /* ScalarType.STRING */, opt: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CopyToPath {
+    return new CopyToPath().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): CopyToPath {
+    return new CopyToPath().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): CopyToPath {
+    return new CopyToPath().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: CopyToPath | PlainMessage<CopyToPath> | undefined, b: CopyToPath | PlainMessage<CopyToPath> | undefined): boolean {
+    return proto3.util.equals(CopyToPath, a, b);
   }
 }
 

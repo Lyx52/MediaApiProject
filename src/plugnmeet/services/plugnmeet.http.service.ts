@@ -3,7 +3,7 @@ import { HttpService } from "@nestjs/axios";
 import { catchError, firstValueFrom, map, retry, timer } from "rxjs";
 
 import { createHmac } from "crypto";
-import { PlugNMeetToRecorder, RecorderToPlugNMeet, RecordingTasks } from "../../proto/plugnmeet_recorder_pb";
+import { PlugNMeetToRecorder, RecorderToPlugNMeet, RecordingTasks } from "src/proto/plugnmeet_recorder_pb";
 import { ConfigService } from "@nestjs/config";
 import { handleAxiosExceptions, retryPolicy } from "../../common/utils/axios.utils";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
@@ -27,8 +27,9 @@ export class PlugNMeetHttpService {
       msg: 'started',
       recordingId: payload.recordingId,
       roomSid: payload.roomSid,
-      roomId: payload.roomId,
+      roomId: payload.roomSid,
       recorderId: recorderId,
+      roomTableId: payload.roomTableId
     }));
   }
   async sendErrorMessage(payload: PlugNMeetToRecorder, recorderId?: string) {
@@ -39,8 +40,9 @@ export class PlugNMeetHttpService {
       msg: 'had error',
       recordingId: payload.recordingId,
       roomSid: payload.roomSid,
-      roomId: payload.roomId,
+      roomId: payload.roomSid,
       recorderId: recorderId,
+      roomTableId: payload.roomTableId
     }));
   }
   async sendEndedMessage(payload: PlugNMeetToRecorder, recorderId: string) {
@@ -51,8 +53,9 @@ export class PlugNMeetHttpService {
       msg: 'no error',
       recordingId: payload.recordingId,
       roomSid: payload.roomSid,
-      roomId: payload.roomId,
+      roomId: payload.roomSid,
       recorderId: recorderId,
+      roomTableId: payload.roomTableId
     }));
   }
   async sendCompletedMessage(payload: PlugNMeetToRecorder, recorderId: string) {
@@ -63,8 +66,11 @@ export class PlugNMeetHttpService {
       msg: 'process completed',
       recordingId: payload.recordingId,
       roomSid: payload.roomSid,
-      roomId: payload.roomId,
+      roomId: payload.roomSid,
       recorderId: recorderId,
+      roomTableId: payload.roomTableId,
+      filePath: "",
+      fileSize: 1,
     }));
   }
   async notifyPlugNMeet(body: RecorderToPlugNMeet): Promise<any> {
