@@ -1,5 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne, ObjectID, ObjectIdColumn } from "typeorm";
-import { ActiveRoomInfo } from "plugnmeet-sdk-js";
+import {RoomMetadataDto} from "../dto/RoomMetadataDto";
 
 /**
  * Entity that holds one conference session
@@ -17,7 +17,7 @@ export class ConferenceSession {
   @Column()
   recorderId: string;
   @Column()
-  metadata: ActiveRoomInfo;
+  metadata: RoomMetadataDto;
   @Column()
   isActive: boolean;
 }

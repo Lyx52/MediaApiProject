@@ -140,8 +140,8 @@ export class OpencastService implements OnModuleInit {
     const headers = this.makeAuthHeader('multipart/form-data');
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/addTrack`, data, {
       headers: headers,
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
+      maxContentLength: videoFile.length * 2,
+      maxBodyLength: videoFile.length * 2
     }).pipe(
       map((response) => response.data.toString()),
       retryPolicy(),
@@ -563,10 +563,10 @@ export class OpencastService implements OnModuleInit {
   }
   async stopAllRecordingEvents(data: PlugNMeetRoomEndedDto): Promise<void> {
     const events = await this.eventRepository.find({
-      where: { roomSid: data.roomMetadata.sid }
+      where: { roomSid: data.roomMetadata.info.sid }
     });
     if (events.length <= 0) {
-      this.logger.warn(`There are no events for conference ${data.roomMetadata.sid}!`)
+      this.logger.warn(`There are no events for conference ${data.roomMetadata.info.sid}!`)
       return;
     }
     for (const event of events)
@@ -638,7 +638,7 @@ export class OpencastService implements OnModuleInit {
      */
     let event = await this.eventRepository.findOne({
       where: {
-        roomSid: data.roomMetadata.sid,
+        roomSid: data.roomMetadata.info.sid,
         recorderId: data.recorderId,
         eventId: {
           $ne: null,
@@ -660,14 +660,16 @@ export class OpencastService implements OnModuleInit {
     event = this.eventRepository.create();
     event.recorderId = data.recorderId;
     event.type = data.type
-    event.roomSid = data.roomMetadata.sid;
+    event.roomSid = data.roomMetadata.info.sid;
     event.start = new Date();
     event.end = new Date();
     event.jobs = [];
-    event.title = `${data.roomMetadata.room_title} ${toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
+    event.title = `${data.roomMetadata.info.room_title} ${toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
     // 60 minutes
     event.end.setTime(event.start.getTime() + 60000 * 60);
-    event.seriesId = "";
+
+    const series: any = await this.createOrGetSeriesByTitle(data.roomMetadata.courseName, `${data.roomMetadata.info.room_title} ${toTitle(data.type)}`);
+    event.seriesId = series.identifier;
     /**
      * Add capture agent if dosnt exist, set it to idle for now
      */
@@ -675,7 +677,7 @@ export class OpencastService implements OnModuleInit {
     /**
      *  Create MediaPackage and add DublinCore metadata to MediaPackage
      */
-    let mediaPackage = await this.createMediaPackageWithId(`${data.roomMetadata.sid}_${data.recorderId}`);
+    let mediaPackage = await this.createMediaPackageWithId(`${data.roomMetadata.info.sid}_${data.type}`);
     mediaPackage = await this.addDublinCore(event, <string>mediaPackage);
     /**
      * Create recording
@@ -688,6 +690,19 @@ export class OpencastService implements OnModuleInit {
     await this.setWorkflow(event, 'lbtu-wf-upload');
     return await this.eventRepository.save(event);
   };
+  private async createOrGetSeriesByTitle(seriesTitle: string, roomName: string) {
+    const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
+    const series: any = await firstValueFrom(this.httpService.get(`${this.host}/api/series/series.json?seriesTitle=${seriesTitle}`, {
+      headers: headers
+    }).pipe(
+        map((response) => response.data),
+        retryPolicy(),
+        handleAxiosExceptions(),
+    ));
+    if (series.length > 0) return series[0];
+    return await this.createSeries(seriesTitle, roomName);
+  }
+
   private makeAuthHeader(contentType = 'application/json') {
     return {
       Authorization: `Basic ${Buffer.from(

@@ -4,6 +4,7 @@ export const PLUGNMEET_SERVICE = 'PLUGNMEET_SERVICE';
 export const OPENCAST_SERVICE = 'OPENCAST_SERVICE';
 export const LIVEKIT_INGRESS_SERVICE = 'LIVEKIT_INGRESS_SERVICE';
 export const LIVEKIT_EGRESS_SERVICE = 'LIVEKIT_EGRESS_SERVICE';
+export const LIVEKIT_SERVICE = 'LIVEKIT_SERVICE';
 
 // Redis keys
 export const PLUGNMEET_RECORDER_INFO_KEY = 'pnm:recorders';
@@ -19,7 +20,7 @@ export const STOP_OPENCAST_EVENT = { cmd: "startOpencastIngest" }
 export const ADD_OPENCAST_INGEST_JOB = { cmd: "addOpencastIngestJob" }
 export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
 export const CREATE_OR_GET_INGRESS_STREAM_KEY = { cmd: 'createOrGetIngressStreamKey' }
-
+export const LIVEKIT_WEBHOOK_EVENT = { cmd: 'livekitWebhookEvent' }
 
 // Job patterns
 export const INGEST_VIDEO_JOB = 'INGEST_VIDEO_JOB';

@@ -27,6 +27,8 @@ import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingD
 import { ConferenceSession } from "../entities/ConferenceSession";
 import { CreateConferenceRoom } from "../dto/CreateConferenceRoom";
 import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
+import {RoomMetadataDto} from "../dto/RoomMetadataDto";
+import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -80,7 +82,10 @@ export class PlugNMeetService implements OnModuleInit {
       entity.roomId = payload.roomId;
       entity.roomSid = response.roomInfo.sid;
       entity.recorderId = null;
-      entity.metadata = <ActiveRoomInfo>{};
+      entity.metadata = <RoomMetadataDto>{
+        courseName: payload.courseName,
+        info: <ActiveRoomInfo>{}
+      }
       await this.conferenceRepository.insert(entity);
     }
     return response;
@@ -115,7 +120,7 @@ export class PlugNMeetService implements OnModuleInit {
         if (roomInfo.status && roomInfo.room) {
           recorder.isRecording = roomInfo.room.room_info.is_recording;
           await this.recorderRepository.save(recorder);
-          conference.metadata = roomInfo.room.room_info;
+          conference.metadata.info = roomInfo.room.room_info;
           conference.recorderId = roomInfo.room.room_info.is_recording ? recorder.recorderId : null;
           await this.conferenceRepository.save(conference);
         }
@@ -159,6 +164,12 @@ export class PlugNMeetService implements OnModuleInit {
   }
 
   async startRecording(payload: PlugNMeetToRecorder) {
+    const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId });
+    if (!roomInfo.status || !roomInfo || !roomInfo.room) {
+      this.logger.error(`There was error getting room metadata`);
+      await this.httpService.sendErrorMessage(payload);
+      return;
+    }
     let conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
     const recorder = await this.recorderRepository.findOne({ where: { isRecording: { $in: [ false, 0 ]} } });
     if (!recorder) {
@@ -174,6 +185,10 @@ export class PlugNMeetService implements OnModuleInit {
        */
       conference = this.conferenceRepository.create();
       //conference.epiphanId = "LBTU_EPIPHAN_112"; // TODO: Remove this!!!!
+      conference.metadata = <RoomMetadataDto>{
+        courseName: "Course_Series_2",
+        info: <ActiveRoomInfo>roomInfo.room.room_info
+      }
       conference.epiphanId = null;
       conference.recorderId = recorder.recorderId;
       conference.roomId = payload.roomId;
@@ -189,13 +204,7 @@ export class PlugNMeetService implements OnModuleInit {
         return;
       }
     }
-    const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId });
-    if (!roomInfo.status || !roomInfo || !roomInfo.room) {
-      this.logger.error(`There was error getting room metadata`);
-      await this.httpService.sendErrorMessage(payload);
-      return;
-    }
-    conference.metadata = roomInfo.room.room_info;
+    conference.metadata.info = <ActiveRoomInfo>roomInfo.room.room_info;
     conference.recorderId = recorder.recorderId;
     conference.isActive = true;
     /**
@@ -243,6 +252,49 @@ export class PlugNMeetService implements OnModuleInit {
     await this.httpService.sendStartedMessage(payload, conference.recorderId);
   }
 
+  async handleRoomEnded(payload: WebhookEvent): Promise<void> {
+    const conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.room.sid } });
+    if (!conference) return;
+    const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId, isRecording: true } });
+    if (recorder) {
+      /**
+       *   Stop egress recording
+       */
+      await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
+        roomMetadata: conference.metadata,
+        ingestRecording: true,
+        recorderId: `${recorder.recorderId}_ROOM_COMPOSITE_${conference.roomSid}`
+      });
+
+      /**
+       *   Stop epiphan recording if epiphanId is provided
+       */
+      if (conference.epiphanId) {
+        await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
+          roomMetadata: conference.metadata,
+          epiphanId: conference.epiphanId,
+          ingestRecording: true,
+          recorderId: `${recorder.recorderId}_PRESENTER_${conference.roomSid}`
+        });
+      }
+
+      /**
+       *  Update entities
+       */
+      conference.recorderId = null;
+      recorder.isRecording = false;
+      await this.recorderRepository.save(recorder);
+      await this.addAvailableRecorder(recorder.recorderId);
+    }
+
+    conference.isActive = false;
+    await this.conferenceRepository.save(conference);
+
+    await this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
+      roomMetadata: conference.metadata
+    });
+  }
+
   async stopRecording(payload: PlugNMeetToRecorder) {
     const conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
     if (!conference) {
@@ -285,19 +337,12 @@ export class PlugNMeetService implements OnModuleInit {
 
       const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId });
       if (roomInfo && roomInfo.room && conference) {
-        conference.metadata = roomInfo.room.room_info;
+        conference.metadata.info = roomInfo.room.room_info;
       }
       conference.recorderId = null;
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);
       await this.addAvailableRecorder(recorder.recorderId);
-    }
-
-    if (payload.task === RecordingTasks.STOP) {
-      conference.isActive = false;
-      this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-        roomMetadata: conference.metadata
-      });
     }
 
     await this.conferenceRepository.save(conference);

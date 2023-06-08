@@ -16,7 +16,6 @@ import {
   IngressState_Status,
   IngressVideoEncodingPreset
 } from "livekit-server-sdk/dist/proto/livekit_ingress";
-import { TrackSource } from "livekit-server-sdk/dist/proto/livekit_models";
 import { PlugNMeetRoomEndedDto } from "../../plugnmeet/dto/PlugNMeetRoomEndedDto";
 
 @Injectable()
@@ -35,13 +34,13 @@ export class LivekitIngressService {
   }
   async deleteAllIngressSessionsOrRetry(data: PlugNMeetRoomEndedDto, retries = 0) {
     try {
-      const ingressSessions = await this.ingressClient.listIngress(data.roomMetadata.room_id);
+      const ingressSessions = await this.ingressClient.listIngress(data.roomMetadata.info.room_id);
       for (const session of ingressSessions)
       {
         await this.ingressClient.deleteIngress(session.ingressId);
       }
     } catch (e) {
-      this.logger.error(`Failed to stop ingress for room ${data.roomMetadata.room_id}!`);
+      this.logger.error(`Failed to stop ingress for room ${data.roomMetadata.info.room_id}!`);
       if (retries <= 3) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         return this.deleteAllIngressSessionsOrRetry(data, retries + 1);
@@ -51,7 +50,7 @@ export class LivekitIngressService {
 
   async createOrGetIngress(data: CreateOrGetIngressStreamKeyDto): Promise<ServiceMessageResponse<IngressInfo>> {
     // Find ingress sessions and filter out publishing/buffering ones
-    const ingressSessions = (await this.ingressClient.listIngress(data.roomMetadata.room_id))
+    const ingressSessions = (await this.ingressClient.listIngress(data.roomMetadata.info.room_id))
       .filter(info => info.state.status !== IngressState_Status.ENDPOINT_PUBLISHING &&
                       info.state.status !== IngressState_Status.ENDPOINT_BUFFERING);
 
@@ -65,8 +64,8 @@ export class LivekitIngressService {
 
     try {
       const options: CreateIngressOptions = {
-        name: `RTMP_INGRESS_${data.roomMetadata.room_id}_${data.epiphanId}`,
-        roomName: data.roomMetadata.room_id,
+        name: `RTMP_INGRESS_${data.roomMetadata.info.room_id}_${data.epiphanId}`,
+        roomName: data.roomMetadata.info.room_id,
         participantIdentity: `RTMP_BOT_${data.epiphanId}`,
         participantName: ''
       };
@@ -76,7 +75,7 @@ export class LivekitIngressService {
         data: result
       };
     } catch (e) {
-      this.logger.error(`Caught exception while starting ${data.roomMetadata.room_id} room egress!\n${e}`);
+      this.logger.error(`Caught exception while starting ${data.roomMetadata.info.room_id} room egress!\n${e}`);
     }
     return <ServiceMessageResponse<IngressInfo>>{
       success: false,

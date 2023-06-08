@@ -2,20 +2,12 @@ import { OnQueueActive, Process, Processor } from "@nestjs/bull";
 import { Job, JobStatus } from "bull";
 import { Logger } from "@nestjs/common";
 import {
-  EVENT_MEDIAPACKAGE_RESOURCE_KEY, INGEST_JOB_RETRY, INGEST_MEDIAPACKAGE_JOB,
-  INGEST_VIDEO_JOB,
-  MEDIAPACKAGE_LOCK_TTL,
-  PLUGNMEET_RECORDER_INFO_KEY
+  INGEST_MEDIAPACKAGE_JOB
 } from "../../app.constants";
 import { OpencastService } from "../services/opencast.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { OpencastEvent } from "../entities/opencast.event";
 import { MongoRepository } from "typeorm";
-import { MediaType } from "../../livekit/dto/enums/MediaType";
-import { IngestJobDto } from "../dto/IngestJobDto";
-import { InjectRedis } from "@liaoliaots/nestjs-redis";
-import Redis from "ioredis";
-import Redlock, { Lock as RLock } from "redlock";
 import { IngestMediaPackageJobDto } from "../dto/IngestMediaPackageJobDto";
 import { existsSync } from "fs";
 
@@ -31,9 +23,8 @@ export class OpencastVideoIngestConsumer {
   @Process(INGEST_MEDIAPACKAGE_JOB)
   async ingestMediaPackage(job: Job<IngestMediaPackageJobDto>) {
     this.logger.debug("Started INGEST_MEDIAPACKAGE_JOB");
-
     const events = await this.eventRepository.find({
-      where: { roomSid: job.data.roomMetadata.sid }
+      where: { roomSid: job.data.roomMetadata.info.sid }
     });
     if (events.length <= 0)
     {
@@ -42,8 +33,6 @@ export class OpencastVideoIngestConsumer {
       return;
     }
     try {
-
-      const series: any = await this.eventService.createSeries(`${job.data.roomMetadata.room_title} PlugNMeet Conference series`, `${job.data.roomMetadata.room_title}`);
       /**
        *  Ingest all events
        */

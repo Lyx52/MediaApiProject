@@ -1,0 +1,7 @@
+version: "3.9"
+services:
+  mongo:
+    image: mongo:4.2.24-bionic
+    restart: always
+    ports:
+      - "27017:27017"

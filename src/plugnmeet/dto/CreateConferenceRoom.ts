@@ -13,8 +13,10 @@ export class CreateConferenceRoom {
   readonly organizer: string;
   @IsString()
   @IsNotEmpty()
+  readonly courseName: string;
+  @IsString()
+  @IsNotEmpty()
   readonly roomId: string;
-
   @IsNotEmpty()
   readonly metadata: RooMetadata;
 }

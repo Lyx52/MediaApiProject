@@ -1,12 +1,15 @@
 import { Body, Controller, Inject, Logger, Post } from "@nestjs/common";
-import { PLUGNMEET_ROOM_ENDED, PLUGNMEET_SERVICE } from "../app.constants";
-import { ClientProxy, Ctx, MessagePattern, Payload } from "@nestjs/microservices";
+import {
+  LIVEKIT_WEBHOOK_EVENT,
+  PLUGNMEET_SERVICE
+} from "../app.constants";
+import {ClientProxy, Ctx, EventPattern, MessagePattern, Payload} from "@nestjs/microservices";
 import { PlugNMeetService } from "./services/plugnmeet.service";
 import { PlugNMeetToRecorder, RecordingTasks } from "../proto/plugnmeet_recorder_pb";
 import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
-import { PlugNMeetRoomEndedDto } from "./dto/PlugNMeetRoomEndedDto";
 import { CreateConferenceRoom } from "./dto/CreateConferenceRoom";
 import { CreateRoomResponse } from "plugnmeet-sdk-js";
+import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 
 @Controller('plugnmeet')
 export class PlugNMeetController {
@@ -22,6 +25,18 @@ export class PlugNMeetController {
   async createConferenceRoom(@Body() payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
     return await this.pnmService.createConferenceRoom(payload);
   }
+  @EventPattern(LIVEKIT_WEBHOOK_EVENT)
+  async handleLivekitWebhookEvents(@Body() data: WebhookEvent) {
+    try {
+      switch(data.event) {
+        case "room_finished":
+          await this.pnmService.handleRoomEnded(data);
+          break;
+      }
+    } catch (e) {
+      this.logger.error(`Caught unhandled exception!\n${e}`);
+    }
+  }
   @MessagePattern('plug-n-meet-recorder')
   async handlePlugNMeetMessage(@Payload() payload: PlugNMeetToRecorder) {
     if (payload.from !== 'plugnmeet') return;
@@ -32,7 +47,6 @@ export class PlugNMeetController {
           await this.pnmService.startRecording(payload);
         }
           break;
-        case RecordingTasks.STOP:
         case RecordingTasks.STOP_RECORDING:
           this.logger.debug(`${payload.task.toString()} for ${payload.roomSid} roomSid!`);
           await this.pnmService.stopRecording(payload);
@@ -42,6 +56,5 @@ export class PlugNMeetController {
       this.logger.error(`Caught unhandled exception!\n${e}`);
       await this.httpService.sendErrorMessage(payload);
     }
-
   }
 }

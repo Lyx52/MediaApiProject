@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ClientsModule, Transport } from "@nestjs/microservices";
-import { LIVEKIT_EGRESS_SERVICE, LIVEKIT_INGRESS_SERVICE } from "../app.constants";
+import {LIVEKIT_EGRESS_SERVICE, LIVEKIT_INGRESS_SERVICE, LIVEKIT_SERVICE} from "../app.constants";
 import { LivekitController } from "./livekit.controller";
 import { LivekitIngressService } from "./services/livekit.ingress.service";
 import { LivekitEgressService } from "./services/livekit.egress.service";
@@ -10,12 +10,14 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { HttpModule } from "@nestjs/axios";
 import { LivekitTaskService } from "./services/livekit.task.service";
+import {LivekitWebhookMiddleware} from "./middleware/livekit.webhook.middleware";
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     ClientsModule.register([{ name: LIVEKIT_EGRESS_SERVICE, transport: Transport.TCP }]),
     ClientsModule.register([{ name: LIVEKIT_INGRESS_SERVICE, transport: Transport.TCP }]),
+    ClientsModule.register([{ name: LIVEKIT_SERVICE, transport: Transport.TCP }]),
     ConfigModule.forRoot({ load: [config] }),
     HttpModule.register({
       timeout: 5000,
@@ -26,4 +28,10 @@ import { LivekitTaskService } from "./services/livekit.task.service";
   providers: [LivekitIngressService, LivekitEgressService, LivekitTaskService],
   controllers: [LivekitController],
 })
-export class LivekitModule {}
+export class LivekitModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+        .apply(LivekitWebhookMiddleware)
+        .forRoutes(LivekitController);
+  }
+}

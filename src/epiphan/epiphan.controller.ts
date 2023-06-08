@@ -70,7 +70,7 @@ export class EpiphanController {
     if (await this.epiphanService.stopEpiphanRecording(data) && data.ingestRecording) {
       // We send stop event message, wait for answer then start ingesting.
       if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
-        roomSid: data.roomMetadata.sid,
+        roomSid: data.roomMetadata.info.sid,
         recorderId: data.recorderId,
       }))) {
         await this.downloadQueue.add(DOWNLOAD_VIDEO_JOB, <DownloadJobDto>data);

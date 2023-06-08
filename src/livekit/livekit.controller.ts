@@ -1,6 +1,8 @@
-import { Body, Controller, Inject, Logger, Post } from "@nestjs/common";
+import {Body, Controller, Inject, Headers, Logger, Post, Req, Request, RawBodyRequest, Header} from "@nestjs/common";
 import {
-  CREATE_OR_GET_INGRESS_STREAM_KEY, INGEST_MEDIAPACKAGE_JOB, PLUGNMEET_ROOM_ENDED,
+  CREATE_OR_GET_INGRESS_STREAM_KEY,
+  LIVEKIT_SERVICE, LIVEKIT_WEBHOOK_EVENT,
+  PLUGNMEET_ROOM_ENDED,
   START_LIVEKIT_EGRESS_RECORDING,
   STOP_LIVEKIT_EGRESS_RECORDING
 } from "../app.constants";
@@ -11,15 +13,40 @@ import { LivekitEgressService } from "./services/livekit.egress.service";
 import { LivekitIngressService } from "./services/livekit.ingress.service";
 import { CreateOrGetIngressStreamKeyDto } from "./dto/CreateOrGetIngressStreamKeyDto";
 import { PlugNMeetRoomEndedDto } from "../plugnmeet/dto/PlugNMeetRoomEndedDto";
-
+import {ConfigService} from "@nestjs/config";
+import {EgressClient, WebhookReceiver} from "livekit-server-sdk";
+import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 @Controller('livekit')
 export class LivekitController {
   private readonly logger: Logger = new Logger(LivekitController.name);
+  private readonly webhookHandler: WebhookReceiver;
   constructor(
     private readonly egressService: LivekitEgressService,
     private readonly ingressService: LivekitIngressService,
-  ) {}
+    private readonly config: ConfigService,
+    @Inject(LIVEKIT_SERVICE) private readonly client: ClientProxy,
+  ) {
+    this.webhookHandler = new WebhookReceiver(
+        this.config.getOrThrow<string>("livekit.key"),
+        this.config.getOrThrow<string>("livekit.secret"),
+    );
+  }
 
+  @Post('webhook')
+  @Header('content-type', 'application/webhook+json')
+  async handleLivekitWebhook(@Body() payload: any, @Headers() headers: any) {
+    try {
+      const webhookEvent: WebhookEvent = await this.webhookHandler.receive(payload.toString(), headers.authorization);
+      // Filter only events we want to send so there's fewer events thrown around
+      switch(webhookEvent.event) {
+        case "room_finished":
+          this.client.emit(LIVEKIT_WEBHOOK_EVENT, <WebhookEvent>webhookEvent);
+          break;
+      }
+    } catch (e) {
+      this.logger.warn(`Failed to handle webhook event from livekit!\n${e}`);
+    }
+  }
   @MessagePattern(START_LIVEKIT_EGRESS_RECORDING)
   async startEgressRecording(@Body() data: StartEgressRecordingDto) {
     this.logger.debug("START_LIVEKIT_EGRESS_RECORDING");

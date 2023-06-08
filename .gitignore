@@ -3,6 +3,9 @@
 /node_modules
 node_modules
 
+# Recordings
+recording_files/
+recording_files
 # IDE
 /.idea
 /.awcache
@@ -28,3 +31,4 @@ dist
 /config-dev.yaml
 sample-10s.mp4
 prod.env
+/recording_files/

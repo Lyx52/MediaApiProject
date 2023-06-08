@@ -280,7 +280,7 @@ export class EpiphanService {
             username: '',
             password: '',
             auto_created: false,
-            name: `${data.roomMetadata.room_title || "PlugNMeet Livestream"}`,
+            name: `${data.roomMetadata.info.room_title || "PlugNMeet Livestream"}`,
           }, { headers: headers }).pipe(
           map((response) => response.data),
           retryPolicy(),

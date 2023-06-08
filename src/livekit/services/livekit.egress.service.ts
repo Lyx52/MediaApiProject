@@ -18,7 +18,7 @@ import Redis from "ioredis";
 import { StartOpencastEventDto } from "../../opencast/dto/StartOpencastEventDto";
 import { StopOpencastEventDto } from "../../opencast/dto/StopOpencastEventDto";
 import { firstValueFrom } from "rxjs";
-
+import * as path from "path";
 @Injectable()
 export class LivekitEgressService {
   private readonly logger = new Logger(LivekitEgressService.name);
@@ -45,16 +45,15 @@ export class LivekitEgressService {
 
         // We send a message and wait for answer
         if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
-          roomSid: data.roomMetadata.sid,
+          roomSid: data.roomMetadata.info.sid,
           recorderId: data.recorderId,
         }))) {
           // Add each file to opencast queue
           for (const file of files) {
             await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
               recorderId: data.recorderId,
-              roomSid: data.roomMetadata.sid,
-              //uri: `${this.recordingLocation}/${file.filename}`,
-              uri: './sample-10s.mp4',
+              roomSid: data.roomMetadata.info.sid,
+              uri: path.resolve(file.filename),
               type: OpencastIngestType.ROOM_COMPOSITE,
               ingested: Date.now()
             });
@@ -65,14 +64,14 @@ export class LivekitEgressService {
     } catch (e) {
       this.logger.error(`Failed to stop egress ${session.egressId}!`);
       if (retries <= 3) {
-        // Await 1 second, maybe we are trying to stop the egress before its been initialized.
+        // Await 1 second, maybe we are trying to stop the egress before it's been initialized.
         await new Promise(resolve => setTimeout(resolve, 1000));
         return this.stopEgressOrRetry(data, session, retries + 1);
       }
     }
   }
   async stopEgressRecording(data: StopEgressRecordingDto) {
-    const sessions = await this.egressClient.listEgress(data.roomMetadata.room_id);
+    const sessions = await this.egressClient.listEgress(data.roomMetadata.info.room_id);
     /**
      *  We only stop first one we find if there are more
      */
@@ -80,13 +79,13 @@ export class LivekitEgressService {
       es.status == EgressStatus.EGRESS_ACTIVE ||
       es.status == EgressStatus.EGRESS_STARTING)
     if (!egressSession) {
-      this.logger.warn(`Tried to stop non existing or already stopped egress session for room ${data.roomMetadata.room_id}!`);
+      this.logger.warn(`Tried to stop non existing or already stopped egress session for room ${data.roomMetadata.info.room_id}!`);
       return;
     }
     await this.stopEgressOrRetry(data, egressSession);
   }
   async startEgressRecording(data: StartEgressRecordingDto): Promise<boolean> {
-    const sessions = await this.egressClient.listEgress(data.roomMetadata.room_id);
+    const sessions = await this.egressClient.listEgress(data.roomMetadata.info.room_id);
     // Check if any are active, starting or ending
     const activeSessions = sessions.filter(es =>
       es.status == EgressStatus.EGRESS_ACTIVE ||
@@ -94,12 +93,12 @@ export class LivekitEgressService {
       es.status == EgressStatus.EGRESS_ENDING);
     if (activeSessions.length > 0)
     {
-      this.logger.error(`Room ${data.roomMetadata.room_id} has ${activeSessions.length} active egress sessions!`);
+      this.logger.error(`Room ${data.roomMetadata.info.room_id} has ${activeSessions.length} active egress sessions!`);
       return false;
     }
     try {
       const result = await this.egressClient.startRoomCompositeEgress(
-        data.roomMetadata.room_id,
+        data.roomMetadata.info.room_id,
         {
           fileType: EncodedFileType.MP4,
           filepath: `${this.recordingLocation}/{room_id}_{room_name}-{time}.mp4`,
@@ -110,7 +109,7 @@ export class LivekitEgressService {
         },
       );
       if (result.error || !result.egressId) {
-        this.logger.error(`Failed to start egress session for room ${data.roomMetadata.room_id}!`);
+        this.logger.error(`Failed to start egress session for room ${data.roomMetadata.info.room_id}!`);
         return false;
       }
       this.client.emit(START_OPENCAST_EVENT, <StartOpencastEventDto> {
@@ -120,7 +119,7 @@ export class LivekitEgressService {
       });
       return true;
     } catch (e) {
-      this.logger.error(`Caught exception while starting ${data.roomMetadata.room_id} room egress!\n${e}`);
+      this.logger.error(`Caught exception while starting ${data.roomMetadata.info.room_id} room egress!\n${e}`);
       return false;
     }
   }

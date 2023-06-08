@@ -53,7 +53,7 @@ export class PlugNMeetTaskService implements OnModuleInit {
       const isRunning = room && room.room_info && room.room_info.is_running;
       if (!isRunning) {
         // Out of sync update
-        if (room?.room_info) conference.metadata = room.room_info;
+        if (room?.room_info) conference.metadata.info = room.room_info;
         conference.isActive = false;
         /**
          *   Stop egress recording
