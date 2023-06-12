@@ -1,8 +1,10 @@
 version: "3.9"
 services:
   mongo:
-    image: mongo:latest
+    image: mongo:4.2.24-bionic
     restart: always
+    networks:
+      - app-intranet
   webapi:
     container_name: 'lbtu-media-api'
     restart: always
@@ -10,5 +12,10 @@ services:
     volumes:
       - ./recordings:/app/recording_files
       - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - app-intranet
     ports:
-      - "9090:9090"
+      - "8899:8899"
+networks:
+  app-intranet:
+    driver: bridge
