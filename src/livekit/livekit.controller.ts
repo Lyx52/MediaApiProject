@@ -14,7 +14,7 @@ import { LivekitIngressService } from "./services/livekit.ingress.service";
 import { CreateOrGetIngressStreamKeyDto } from "./dto/CreateOrGetIngressStreamKeyDto";
 import { PlugNMeetRoomEndedDto } from "../plugnmeet/dto/PlugNMeetRoomEndedDto";
 import {ConfigService} from "@nestjs/config";
-import {EgressClient, WebhookReceiver} from "livekit-server-sdk";
+import { EgressClient, IngressInfo, WebhookReceiver } from "livekit-server-sdk";
 import { WebhookEvent } from "livekit-server-sdk/dist/proto/livekit_webhook";
 @Controller('livekit')
 export class LivekitController {
@@ -62,15 +62,20 @@ export class LivekitController {
   }
 
   @MessagePattern(START_LIVEKIT_EGRESS_RECORDING)
-  async startEgressRecording(@Body() data: StartEgressRecordingDto) {
+  async startEgressRecording(@Body() data: StartEgressRecordingDto): Promise<boolean> {
     this.logger.debug("START_LIVEKIT_EGRESS_RECORDING");
+
     return await this.egressService.startEgressRecording(data);
   }
 
   @MessagePattern(CREATE_OR_GET_INGRESS_STREAM_KEY)
-  async createOrGetIngressStreamKey(@Body() data: CreateOrGetIngressStreamKeyDto) {
+  async createOrGetIngressStreamKey(@Body() data: CreateOrGetIngressStreamKeyDto): Promise<ServiceMessageResponse<IngressInfo>>  {
     this.logger.debug("CREATE_OR_GET_INGRESS_STREAM_KEY");
-    return await this.ingressService.createOrGetIngress(data);
+    const ingressSession = await this.ingressService.createOrGetIngress(data);
+    return <ServiceMessageResponse<IngressInfo>>{
+      success: ingressSession !== undefined && ingressSession !== null,
+      data: ingressSession
+    }
   }
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {

@@ -48,7 +48,7 @@ export class LivekitIngressService {
     }
   }
 
-  async createOrGetIngress(data: CreateOrGetIngressStreamKeyDto): Promise<ServiceMessageResponse<IngressInfo>> {
+  async createOrGetIngress(data: CreateOrGetIngressStreamKeyDto): Promise<IngressInfo | undefined> {
     // Find ingress sessions and filter out publishing/buffering ones
     const ingressSessions = (await this.ingressClient.listIngress(data.roomMetadata.info.room_id))
       .filter(info => info.state.status !== IngressState_Status.ENDPOINT_PUBLISHING &&
@@ -56,10 +56,7 @@ export class LivekitIngressService {
 
     // Return free ingress session
     if (ingressSessions.length > 0) {
-      return <ServiceMessageResponse<IngressInfo>>{
-        success: true,
-        data: ingressSessions[0]
-      }
+      return ingressSessions[0];
     }
 
     try {
@@ -69,17 +66,9 @@ export class LivekitIngressService {
         participantIdentity: `RTMP_BOT_${data.epiphanId}`,
         participantName: ''
       };
-      const result = await this.ingressClient.createIngress(IngressInput.RTMP_INPUT, options);
-      return <ServiceMessageResponse<IngressInfo>>{
-        success: result !== undefined && result !== null,
-        data: result
-      };
+      return await this.ingressClient.createIngress(IngressInput.RTMP_INPUT, options);
     } catch (e) {
       this.logger.error(`Caught exception while starting ${data.roomMetadata.info.room_id} room egress!\n${e}`);
-    }
-    return <ServiceMessageResponse<IngressInfo>>{
-      success: false,
-      data: {}
     }
   }
 

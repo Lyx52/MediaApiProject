@@ -254,7 +254,7 @@ export class EpiphanService {
     }
 
     // 2. Create or get ingress stream key
-    const streamKeyCreateResponse = await firstValueFrom(
+    const streamKeyCreateResponse: ServiceMessageResponse<IngressInfo> = await firstValueFrom(
       this.client.send<ServiceMessageResponse<IngressInfo>, CreateOrGetIngressStreamKeyDto>(CREATE_OR_GET_INGRESS_STREAM_KEY, <CreateOrGetIngressStreamKeyDto>
       {
         epiphanId: data.epiphanId,

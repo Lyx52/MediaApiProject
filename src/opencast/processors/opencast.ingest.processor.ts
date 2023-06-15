@@ -49,8 +49,13 @@ export class OpencastVideoIngestConsumer {
             }
             mediaPackage = <string>await this.eventService.addTrackFileFromFs(mediaPackage, job.uri, `${event.type}-${videoPart++}`);
           }
+          if (jobs.length > 0) {
+            await this.eventService.ingestRecordings(mediaPackage, event.eventId);
+          } else {
+            this.logger.warn("No media files were added to event, skipping ingestion");
+          }
         }
-        await this.eventService.ingestRecordings(mediaPackage, event.eventId);
+
       }
       await job.moveToCompleted();
     } catch (e)

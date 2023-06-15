@@ -190,7 +190,8 @@ export class PlugNMeetService implements OnModuleInit {
        */
       conference = this.conferenceRepository.create();
       conference.metadata = <RoomMetadataDto>{
-        courseName: "Course_Series_2",
+        courseName: "Course_Series_2", // TODO: This course is for testing, remove this
+        //courseName: "PlugNMeet Conference",
         info: <ActiveRoomInfo>roomInfo.room_info
       }
       conference.epiphanId = null;
