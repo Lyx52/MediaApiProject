@@ -1,7 +1,7 @@
 version: "3.9"
 services:
   mongo:
-    image: mongo:4.2.24-bionic
+    image: mongo:latest
     restart: always
     networks:
       - app-intranet
@@ -14,8 +14,11 @@ services:
       - ./config.yaml:/app/config.yaml:ro
     networks:
       - app-intranet
+      - lbtu-conference-network
     ports:
       - "8899:8899"
 networks:
   app-intranet:
     driver: bridge
+  lbtu-conference-network:
+    external: true

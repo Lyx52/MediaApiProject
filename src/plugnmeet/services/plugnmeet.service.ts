@@ -189,12 +189,11 @@ export class PlugNMeetService implements OnModuleInit {
        *  It won't have epiphan device recordings!
        */
       conference = this.conferenceRepository.create();
-      conference.epiphanId = "LBTU_EPIPHAN_112"; // TODO: Remove this!!!!
       conference.metadata = <RoomMetadataDto>{
         courseName: "Course_Series_2",
         info: <ActiveRoomInfo>roomInfo.room_info
       }
-      //conference.epiphanId = null;
+      conference.epiphanId = null;
       conference.recorderId = recorder.recorderId;
       conference.roomId = roomInfo.room_info.room_id;
       conference.roomSid = payload.roomSid;
