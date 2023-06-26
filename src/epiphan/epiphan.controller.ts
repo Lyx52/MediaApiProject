@@ -18,6 +18,7 @@ import { StartOpencastEventDto } from "../opencast/dto/StartOpencastEventDto";
 import { OpencastIngestType } from "../opencast/dto/enums/OpencastIngestType";
 import { firstValueFrom } from "rxjs";
 import { StopOpencastEventDto } from "../opencast/dto/StopOpencastEventDto";
+import { GetRecordingDevicesDto } from "./dto/GetRecordingDevicesDto";
 
 @Controller('epiphan')
 export class EpiphanController {
@@ -30,8 +31,10 @@ export class EpiphanController {
   }
 
   @Get()
-  async getAllDeviceLocations(): Promise<RecordingDeviceDto[]> {
-    return this.epiphanService.getAllDeviceLocations();
+  async getAllDeviceLocations(): Promise<GetRecordingDevicesDto> {
+    return <GetRecordingDevicesDto>{
+      devices: this.epiphanService.getAllDeviceLocations()
+    };
   }
 
   @MessagePattern(START_EPIPHAN_RECORDING)
