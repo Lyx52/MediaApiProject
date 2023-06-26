@@ -70,20 +70,25 @@ export class PlugNMeetService implements OnModuleInit {
     const response = await this.PNMController.createRoom({
       room_id: payload.roomId,
       metadata: payload.metadata,
-      empty_timeout: this.config.get<number>('plugnmeet.empty_room_timeout') || 900,
-      max_participants: this.config.get<number>('plugnmeet.max_room_participants') || 25
+      empty_timeout: payload.emptyTimeout || this.config.get<number>('plugnmeet.empty_room_timeout') || 900,
+      max_participants:  payload.maxParticipants || this.config.get<number>('plugnmeet.max_room_participants') || 25
     });
     if (response.status) {
       /**
        * Conference is added create it
        */
+      const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId })
+      if (!roomInfo?.room?.room_info?.sid || response?.roomInfo?.sid)
+        throw new Error("Cannot create valid PlugNMeet room!");
+
+      // TODO: Add ability to add multiple epiphan devices
       const entity = this.conferenceRepository.create();
-      entity.epiphanId = payload.epiphanId;
+      entity.epiphanId = payload.epiphanDevices && payload.epiphanDevices.length > 0 ? payload.epiphanDevices[0] : null;
       entity.roomId = payload.roomId;
-      entity.roomSid = response.roomInfo.sid;
+      entity.roomSid = roomInfo?.room?.room_info?.sid || response.roomInfo?.sid;
       entity.recorderId = null;
       entity.metadata = <RoomMetadataDto>{
-        courseName: payload.courseName,
+        courseName: payload.opencastSeriesId,
         info: <ActiveRoomInfo>{}
       }
       await this.conferenceRepository.insert(entity);
