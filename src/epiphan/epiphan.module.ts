@@ -8,6 +8,7 @@ import { ClientsModule, Transport } from "@nestjs/microservices";
 import { EPIPHAN_SERVICE } from "../app.constants";
 import { BullModule } from "@nestjs/bull";
 import { EpiphanDownloadConsumer } from "./processors/epiphan.download.processor";
+import {PassportModule} from "@nestjs/passport";
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { EpiphanDownloadConsumer } from "./processors/epiphan.download.processor
         removeOnComplete: true
       }
     }),
+    PassportModule.register({ defaultStrategy: 'hmac' }),
     HttpModule.register({
       timeout: 5000,
       maxRedirects: 5,
@@ -26,7 +28,8 @@ import { EpiphanDownloadConsumer } from "./processors/epiphan.download.processor
     ConfigModule.forRoot({ load: [config] }),
   ],
   providers: [
-    EpiphanService, EpiphanDownloadConsumer
+    EpiphanService,
+    EpiphanDownloadConsumer
   ],
   controllers: [EpiphanController]
 })

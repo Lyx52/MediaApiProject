@@ -9,6 +9,7 @@ import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/opencast.event";
 import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import {PassportModule} from "@nestjs/passport";
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -24,6 +25,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
       }),
       inject: [ConfigService],
     }),
+    PassportModule.register({ defaultStrategy: 'hmac' }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
@@ -39,8 +41,5 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
     }),
     EpiphanModule, PlugNMeetModule, LivekitModule, OpencastModule
   ],
-  providers: [
-
-  ]
 })
 export class AppModule {}

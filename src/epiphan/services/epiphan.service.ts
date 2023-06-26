@@ -10,17 +10,12 @@ import { handleAxiosExceptions, makeBasicAuthHeader, retryPolicy } from "../../c
 import { StopEpiphanRecordingDto } from "../dto/StopEpiphanRecordingDto";
 import { ConfigService } from "@nestjs/config";
 import { GetEpiphanRecordingsDto } from "../dto/GetEpiphanRecordingsDto";
-import { URL } from 'url';
 import {
-  ADD_OPENCAST_INGEST_JOB,
-  CREATE_OR_GET_INGRESS_STREAM_KEY, DOWNLOAD_VIDEO_JOB,
-  EPIPHAN_SERVICE,
-  START_EPIPHAN_RECORDING
+  CREATE_OR_GET_INGRESS_STREAM_KEY,
+  EPIPHAN_SERVICE
 } from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { CreateOrGetIngressStreamKeyDto } from "../../livekit/dto/CreateOrGetIngressStreamKeyDto";
-import * as stream from "stream";
-import { DownloadJobDto } from "../dto/DownloadJobDto";
 import { IngressInfo } from "livekit-server-sdk";
 import { RecordingDeviceDto } from "../dto/RecordingDeviceDto";
 import { EpiphanDto } from "../dto/EpiphanDto";

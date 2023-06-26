@@ -3,6 +3,8 @@ appconfig:
   max_recorders: 2
   port: 9999
   recording_location: './recording_files'
+  key: MEDIA_API_KEY
+  secret: MEDIA_API_SECRET
 plugnmeet:
   host: PLUG_N_MEET_SERVER_DOMAIN
   key: PLUG_N_MEET_API_KEY

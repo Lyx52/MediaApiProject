@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Logger } from "@nestjs/common";
+import {Body, Controller, Get, Inject, Logger, UseGuards} from "@nestjs/common";
 import { EpiphanService } from "./services/epiphan.service";
 import { ClientProxy, EventPattern, MessagePattern } from "@nestjs/microservices";
 import { StartEpiphanRecordingDto } from "./dto/StartEpiphanRecordingDto";
@@ -13,7 +13,6 @@ import { StopEpiphanRecordingDto } from "./dto/StopEpiphanRecordingDto";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { DownloadJobDto } from "./dto/DownloadJobDto";
-import { RecordingDeviceDto } from "./dto/RecordingDeviceDto";
 import { StartOpencastEventDto } from "../opencast/dto/StartOpencastEventDto";
 import { OpencastIngestType } from "../opencast/dto/enums/OpencastIngestType";
 import { firstValueFrom } from "rxjs";

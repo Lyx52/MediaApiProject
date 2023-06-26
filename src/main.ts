@@ -3,9 +3,8 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 import { PlugNMeetToRecorderDeserializer } from "./common/deserializers/PlugNMeetToRecorderDeserializer";
 import { RedisOptions } from "@nestjs/microservices/interfaces/microservice-configuration.interface";
-import { BullModule } from "@nestjs/bull";
-import { ConfigModule, ConfigService } from "@nestjs/config";
 import config from './common/utils/config.yaml';
+import {HmacAuthGuard} from "./common/middleware/hmac.authguard";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.connectMicroservice<MicroserviceOptions>({
@@ -22,10 +21,11 @@ async function bootstrap() {
       deserializer: new PlugNMeetToRecorderDeserializer()
     },
   });
-
   if (!cfg.appconfig || !cfg.appconfig.port)
     throw new Error("Invalid redis configuration provided! No application port specified!");
-
+  if (!cfg.appconfig || !cfg.appconfig.secret || !cfg.appconfig.key)
+    throw new Error("Invalid or no api key and secret provided!");
+  app.useGlobalGuards(new HmacAuthGuard(cfg.appconfig.secret, cfg.appconfig.key));
   await app.startAllMicroservices();
   await app.listen(cfg.appconfig.port);
   console.log(`Application is running on: ${await app.getUrl()}`);
