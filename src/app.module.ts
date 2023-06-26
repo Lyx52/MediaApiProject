@@ -9,7 +9,6 @@ import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/opencast.event";
 import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import {PassportModule} from "@nestjs/passport";
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -25,7 +24,6 @@ import {PassportModule} from "@nestjs/passport";
       }),
       inject: [ConfigService],
     }),
-    PassportModule.register({ defaultStrategy: 'hmac' }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
