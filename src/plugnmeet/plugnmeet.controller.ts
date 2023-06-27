@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Logger, Post } from "@nestjs/common";
+import {Body, Controller, Header, HttpCode, Inject, Logger, Post} from "@nestjs/common";
 import {
   LIVEKIT_WEBHOOK_EVENT,
   PLUGNMEET_SERVICE
@@ -7,7 +7,7 @@ import {ClientProxy, Ctx, EventPattern, MessagePattern, Payload} from "@nestjs/m
 import { PlugNMeetService } from "./services/plugnmeet.service";
 import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
 import { CreateConferenceRoom } from "./dto/CreateConferenceRoom";
-import { CreateRoomResponse } from "plugnmeet-sdk-js";
+import {CreateRoomResponse, CreateRoomResponseRoomInfo} from "plugnmeet-sdk-js";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 import { PlugNMeetToRecorder, RecordingTasks } from "src/proto/plugnmeet_recorder_pb";
 
@@ -22,6 +22,8 @@ export class PlugNMeetController {
   ) {}
 
   @Post()
+  @HttpCode(200)
+  @Header('Cache-Control', 'none')
   async createConferenceRoom(@Body() payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
     return await this.pnmService.createConferenceRoom(payload);
   }

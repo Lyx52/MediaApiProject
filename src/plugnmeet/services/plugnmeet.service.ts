@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
-import {ActiveRoomInfo, CreateRoomResponse, PlugNmeet, Room} from "plugnmeet-sdk-js";
+import {ActiveRoomInfo, CreateRoomResponse, CreateRoomResponseRoomInfo, PlugNmeet, Room} from "plugnmeet-sdk-js";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import {
@@ -77,19 +77,28 @@ export class PlugNMeetService implements OnModuleInit {
       /**
        * Conference is added create it
        */
-      const roomInfo = await this.PNMController.getActiveRoomInfo({ room_id: payload.roomId })
-      if (!roomInfo?.room?.room_info?.sid || response?.roomInfo?.sid)
-        throw new Error("Cannot create valid PlugNMeet room!");
+      const roomInfo = await this.PNMController.getActiveRoomInfo({room_id: payload.roomId});
+      if (!roomInfo.status && !response.roomInfo) {
+        response.status = false;
+        response.msg = "Cannot create valid PlugNMeet room!";
+        return response;
+      }
+
+      if (!response.roomInfo) {
+        response.roomInfo = <CreateRoomResponseRoomInfo><unknown>{
+          ...roomInfo.room.room_info
+        }
+      }
 
       // TODO: Add ability to add multiple epiphan devices
       const entity = this.conferenceRepository.create();
       entity.epiphanId = payload.epiphanDevices && payload.epiphanDevices.length > 0 ? payload.epiphanDevices[0] : null;
       entity.roomId = payload.roomId;
-      entity.roomSid = roomInfo?.room?.room_info?.sid || response.roomInfo?.sid;
+      entity.roomSid = response.roomInfo.sid;
       entity.recorderId = null;
       entity.metadata = <RoomMetadataDto>{
         courseName: payload.opencastSeriesId,
-        info: <ActiveRoomInfo>{}
+        info: roomInfo.room.room_info || {}
       }
       await this.conferenceRepository.insert(entity);
     }
