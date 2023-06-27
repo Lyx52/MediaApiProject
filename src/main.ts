@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import {NestFactory, Reflector} from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 import { PlugNMeetToRecorderDeserializer } from "./common/deserializers/PlugNMeetToRecorderDeserializer";
@@ -25,7 +25,9 @@ async function bootstrap() {
     throw new Error("Invalid redis configuration provided! No application port specified!");
   if (!cfg.appconfig || !cfg.appconfig.secret || !cfg.appconfig.key)
     throw new Error("Invalid or no api key and secret provided!");
-  app.useGlobalGuards(new HmacAuthGuard(cfg.appconfig.secret, cfg.appconfig.key));
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(new HmacAuthGuard(cfg.appconfig.secret, cfg.appconfig.key, reflector));
+
   await app.startAllMicroservices();
   await app.listen(cfg.appconfig.port);
   console.log(`Application is running on: ${await app.getUrl()}`);

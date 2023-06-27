@@ -16,6 +16,7 @@ import { PlugNMeetRoomEndedDto } from "../plugnmeet/dto/PlugNMeetRoomEndedDto";
 import {ConfigService} from "@nestjs/config";
 import { EgressClient, IngressInfo, WebhookReceiver } from "livekit-server-sdk";
 import { WebhookEvent } from "livekit-server-sdk/dist/proto/livekit_webhook";
+import {Public} from "../common/utils/decorators/public.decorator";
 @Controller('livekit')
 export class LivekitController {
   private readonly logger: Logger = new Logger(LivekitController.name);
@@ -45,6 +46,7 @@ export class LivekitController {
   }
 
   @Post('webhook')
+  @Public()
   @Header('content-type', 'application/webhook+json')
   async handleLivekitWebhook(@Body() payload: any, @Headers() headers: any) {
     try {
