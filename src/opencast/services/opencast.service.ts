@@ -135,7 +135,7 @@ export class OpencastService implements OnModuleInit {
     const videoFile = await fs.readFile(uri);
     const data = new FormData();
     data.append('mediaPackage', mediaPackage);
-    data.append('flavor', `${sourceType}/source`);
+    data.append('flavor', `${sourceType}/part`);
     data.append('BODY1', new Blob([videoFile]), basename(uri));
     const headers = this.makeAuthHeader('multipart/form-data');
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/addTrack`, data, {
