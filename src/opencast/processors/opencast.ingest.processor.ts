@@ -47,7 +47,7 @@ export class OpencastVideoIngestConsumer {
               this.logger.warn(`File ${job.uri} does not exist! Wont be ingesting!`);
               continue;
             }
-            mediaPackage = <string>await this.eventService.addTrackFileFromFs(mediaPackage, job.uri, `${event.type}-${videoPart++}`);
+            mediaPackage = <string>await this.eventService.addTrackFileFromFs(mediaPackage, job.uri, `presenter-${videoPart++}`);
           }
           if (jobs.length > 0) {
             await this.eventService.ingestRecordings(mediaPackage, event.eventId);
