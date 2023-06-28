@@ -46,53 +46,57 @@ export class PlugNMeetTaskService implements OnModuleInit {
   @Cron(CronExpression.EVERY_30_SECONDS)
   async syncRoomState()
   {
-    const activeRooms = await this.PNMController.getActiveRoomsInfo();
-    const activeConferences = await this.conferenceRepository.find({ where: { isActive: true } });
-    for (const conference of activeConferences) {
-      const room = activeRooms.rooms.find(r => r.room_info.sid === conference.roomSid);
-      const isRunning = room && room.room_info && room.room_info.is_running;
-      if (!isRunning) {
-        // Out of sync update
-        if (room?.room_info) conference.metadata.info = room.room_info;
-        conference.isActive = false;
-        /**
-         *   Stop egress recording
-         */
-        await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
-          roomMetadata: conference.metadata,
-          ingestRecording: true,
-          recorderId: `${conference.recorderId}_ROOM_COMPOSITE_${conference.roomSid}`
-        });
-
-        /**
-         *   Stop epiphan recording if epiphanId is provided
-         */
-        if (conference.epiphanId) {
-          await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
+    try {
+      const activeRooms = await this.PNMController.getActiveRoomsInfo();
+      const activeConferences = await this.conferenceRepository.find({ where: { isActive: true } });
+      for (const conference of activeConferences) {
+        const room = activeRooms.rooms.find(r => r.room_info.sid === conference.roomSid);
+        const isRunning = room && room.room_info && room.room_info.is_running;
+        if (!isRunning) {
+          // Out of sync update
+          if (room?.room_info) conference.metadata.info = room.room_info;
+          conference.isActive = false;
+          /**
+           *   Stop egress recording
+           */
+          await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
             roomMetadata: conference.metadata,
-            epiphanId: conference.epiphanId,
             ingestRecording: true,
-            recorderId: `${conference.recorderId}_PRESENTER_${conference.roomSid}`
+            recorderId: `${conference.recorderId}_ROOM_COMPOSITE_${conference.roomSid}`
           });
-        }
-        this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-          roomMetadata: conference.metadata
-        });
-        // Do some additional check if recorder is not "recording"
-        const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId } });
-        if (recorder && recorder?.isRecording) {
-          const otherConferences = activeConferences.filter(r => r.recorderId === recorder.recorderId && r.id !== conference.id);
-          if (otherConferences.length <= 0) {
-            // Recorder is active only for this conference thus should not be running
-            recorder.isRecording = false;
-            await this.recorderRepository.save(recorder);
+
+          /**
+           *   Stop epiphan recording if epiphanId is provided
+           */
+          if (conference.epiphanId) {
+            await this.client.emit(STOP_EPIPHAN_RECORDING, <StopEpiphanRecordingDto>{
+              roomMetadata: conference.metadata,
+              epiphanId: conference.epiphanId,
+              ingestRecording: true,
+              recorderId: `${conference.recorderId}_PRESENTER_${conference.roomSid}`
+            });
           }
+          this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
+            roomMetadata: conference.metadata
+          });
+          // Do some additional check if recorder is not "recording"
+          const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId } });
+          if (recorder && recorder?.isRecording) {
+            const otherConferences = activeConferences.filter(r => r.recorderId === recorder.recorderId && r.id !== conference.id);
+            if (otherConferences.length <= 0) {
+              // Recorder is active only for this conference thus should not be running
+              recorder.isRecording = false;
+              await this.recorderRepository.save(recorder);
+            }
 
+          }
+          conference.recorderId = null;
         }
-        conference.recorderId = null;
-      }
 
-      await this.conferenceRepository.save(conference);
+        await this.conferenceRepository.save(conference);
+      }
+    } catch (e) {
+      this.logger.warn(`SyncRoomState failed with ${e}`);
     }
   }
 

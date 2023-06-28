@@ -33,20 +33,24 @@ export class LivekitTaskService implements OnModuleInit{
   @Cron('45 * * * * *')
   async syncEgressSessions()
   {
-    const activeRooms = await this.PNMController.getActiveRoomsInfo();
-    const sessions = await this.egressClient.listEgress();
-    const activeSessions = sessions.filter((es) =>
-      (
-        es.status === EgressStatus.EGRESS_ACTIVE ||
-        es.status === EgressStatus.EGRESS_STARTING
-      ) &&
-      (Date.now() - es.startedAt) > 300000 // 5 Minutes
-    );
-    for (const session of activeSessions) {
-      const room = activeRooms.rooms.find(r => r.room_info.sid === session.roomId);
-      if (room && room.room_info.is_recording) continue;
-      this.logger.warn(`Found active egress session ${session.egressId} without a conference room!`);
-      await this.egressClient.stopEgress(session.egressId);
+    try {
+      const activeRooms = await this.PNMController.getActiveRoomsInfo();
+      const sessions = await this.egressClient.listEgress();
+      const activeSessions = sessions.filter((es) =>
+        (
+          es.status === EgressStatus.EGRESS_ACTIVE ||
+          es.status === EgressStatus.EGRESS_STARTING
+        ) &&
+        (Date.now() - es.startedAt) > 300000 // 5 Minutes
+      );
+      for (const session of activeSessions) {
+        const room = activeRooms.rooms.find(r => r.room_info.sid === session.roomId);
+        if (room && room.room_info.is_recording) continue;
+        this.logger.warn(`Found active egress session ${session.egressId} without a conference room!`);
+        await this.egressClient.stopEgress(session.egressId);
+      }
+    } catch (e) {
+      this.logger.warn(`SyncEgressSessions failed with ${e}`);
     }
   }
 
