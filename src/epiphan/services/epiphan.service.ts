@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
@@ -20,11 +20,13 @@ import { IngressInfo } from "livekit-server-sdk";
 import { RecordingDeviceDto } from "../dto/RecordingDeviceDto";
 import { EpiphanDto } from "../dto/EpiphanDto";
 import { PingEpiphanDto } from "../dto/PingEpiphanDto";
+import { PingEpiphanResDto } from "../dto/PingEpiphanResDto";
 @Injectable()
-export class EpiphanService {
+export class EpiphanService implements OnModuleInit {
   private readonly logger: Logger = new Logger(EpiphanService.name);
   private readonly livekitRTMPUrl: string;
   private readonly epiphanDevices: EpiphanDto[];
+  private activeDevices: PingEpiphanResDto[];
   constructor(
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
@@ -34,11 +36,36 @@ export class EpiphanService {
     this.epiphanDevices = this.config.getOrThrow<EpiphanDto[]>("epiphan_config");
   }
 
+  async onModuleInit() {
+    const allDevices = this.getAllDeviceLocations();
+    this.activeDevices = await this.pingEpiphanDevices(allDevices.map(d => d.deviceIdentifier));
+  }
+  async updateActiveDevices() {
+    // 15 sec
+    const requireUpdate = this.activeDevices.filter(d => Date.now() - d.lastPinged > 15_000).map(d => d.epiphanId);
+    const responses = await this.pingEpiphanDevices(requireUpdate);
+    this.activeDevices.forEach((device, index) => {
+      const updatedDevice = responses.find(d => d.epiphanId === device.epiphanId);
+      if (updatedDevice)
+      {
+        this.activeDevices[index] = updatedDevice;
+      }
+    });
+  }
+  public pingEpiphanDevices(epiphanIds: string[]) {
+    const epiphanDevicePings = epiphanIds.map(epiphanId => this.pingEpiphanDevice({ epiphanId: epiphanId }));
+    return Promise.all(epiphanDevicePings);
+  }
   getAllDeviceLocations(): RecordingDeviceDto[] {
     return this.epiphanDevices.map(cfg => <RecordingDeviceDto>{
       deviceIdentifier: cfg.identifier,
       deviceName: cfg.name
     });
+  }
+  async getAllActiveDeviceLocations(): Promise<RecordingDeviceDto[]> {
+    await this.updateActiveDevices();
+    const allDevices = this.getAllDeviceLocations();
+    return allDevices.filter(device => this.activeDevices.find(activeDevice => activeDevice.epiphanId === device.deviceIdentifier && activeDevice.active));
   }
   findConfig(epiphanId: string): EpiphanDto {
     return <EpiphanDto>this.epiphanDevices.find(cfg => cfg.identifier === epiphanId);
@@ -47,13 +74,13 @@ export class EpiphanService {
    * Pings epiphan device
    * @param data
    */
-  async pingEpiphanDevice(data: PingEpiphanDto): Promise<boolean> {
+  async pingEpiphanDevice(data: PingEpiphanDto): Promise<PingEpiphanResDto> {
     // 1. Find epiphan device
     const epiphanConfig = await this.findConfig(data.epiphanId);
 
     if (!epiphanConfig) {
       this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
-      return true;
+      return { epiphanId: data.epiphanId, active: false, lastPinged: Date.now() };
     }
 
     // 2. Ping epiphan using API
@@ -66,11 +93,11 @@ export class EpiphanService {
         map((response) => response.data),
         handleAxiosExceptions(),
       ));
-      return response && response.status == "ok";
+      return { epiphanId: data.epiphanId, active: response && response.status == "ok", lastPinged: Date.now() };
     } catch (e) {
       this.logger.error(`Error while starting Epiphan livestream: ${e}`);
     }
-    return false;
+    return { epiphanId: data.epiphanId, active: false, lastPinged: Date.now() };
   }
   /**
    * Stops epiphan livestreams using epiphan API

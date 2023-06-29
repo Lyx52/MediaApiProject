@@ -31,6 +31,7 @@ import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
 import {RoomMetadataDto} from "../dto/RoomMetadataDto";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 import { PingEpiphanDto } from "../../epiphan/dto/PingEpiphanDto";
+import { PingEpiphanResDto } from "../../epiphan/dto/PingEpiphanResDto";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -69,18 +70,12 @@ export class PlugNMeetService implements OnModuleInit {
     return result;
   }
   public pingEpiphanDevice = (epiphanId: string) =>
-    this.client.send<boolean, PingEpiphanDto>(PING_EPIPHAN_DEVICE, <PingEpiphanDto>{
+    firstValueFrom(this.client.send<PingEpiphanResDto, PingEpiphanDto>(PING_EPIPHAN_DEVICE, <PingEpiphanDto>{
       epiphanId: epiphanId
-    });
+    }));
   public pingAllEpiphanDevices(epiphanIds: string[]) {
     const epiphanDevicePings = epiphanIds.map(epiphanId => this.pingEpiphanDevice(epiphanId));
-    return Promise.all(epiphanDevicePings)
-      .then(results => {
-        return epiphanIds.map((device, index) => ({
-          device,
-          active: results[index]
-        }));
-      });
+    return Promise.all(epiphanDevicePings);
   }
   async createConferenceRoom(payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
     const response = await this.PNMController.createRoom({

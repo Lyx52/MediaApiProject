@@ -30,11 +30,11 @@ export class PlugNMeetController {
       const pingResults = await this.pnmService.pingAllEpiphanDevices(payload.epiphanDevices);
       const inactiveDevices = pingResults.filter(d => !d.active);
       if (inactiveDevices.length > 0) {
-        this.logger.error(`Some epiphan devices are not reachable [${inactiveDevices.map(d => d.device).join(",")}]!`)
+        this.logger.error(`Some epiphan devices are not reachable [${inactiveDevices.map(d => d.epiphanId).join(",")}]!`)
         return <CreateRoomResponse>{
           status: false,
           msg: "Some epiphan devices are not reachable!",
-          devices: inactiveDevices.map(d => d.device)
+          devices: inactiveDevices.map(d => d.epiphanId)
         };
       }
     }

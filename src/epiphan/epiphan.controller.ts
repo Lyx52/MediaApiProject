@@ -33,7 +33,7 @@ export class EpiphanController {
   @Get()
   async getAllDeviceLocations(): Promise<GetRecordingDevicesDto> {
     return <GetRecordingDevicesDto>{
-      devices: this.epiphanService.getAllDeviceLocations()
+      devices: await this.epiphanService.getAllActiveDeviceLocations()
     };
   }
   @MessagePattern(PING_EPIPHAN_DEVICE)
