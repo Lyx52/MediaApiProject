@@ -232,9 +232,9 @@ export class PlugNMeetService implements OnModuleInit {
       /**
        * Check if conference has been stopped for longer than 15 seconds to await recorders/ingress to shutdown
        */
-      if (Date.now() - conference.started < CONFERENCE_MIN_AWAIT)
+      if ((Date.now() - conference.ended) < CONFERENCE_MIN_AWAIT)
       {
-        this.logger.error(`Failed to start conference recording! Conference has not been stopped for longer than ${CONFERENCE_MIN_AWAIT / 1000} seconds`);
+        this.logger.error(`Failed to start conference recording! Conference has not been ended for longer than ${CONFERENCE_MIN_AWAIT / 1000} seconds`);
         await this.httpService.sendErrorMessage(payload, payload.recorderId);
         return;
       }
@@ -358,7 +358,7 @@ export class PlugNMeetService implements OnModuleInit {
       /**
        * Check if conference has been started for longer than 15 seconds to await recorders/ingress to start
        */
-      if (Date.now() - conference.started > CONFERENCE_MIN_AWAIT)
+      if ((Date.now() - conference.started) < CONFERENCE_MIN_AWAIT)
       {
         this.logger.error(`Failed to stop conference recording! Conference has not been started for longer than ${CONFERENCE_MIN_AWAIT / 1000} seconds`);
         await this.httpService.sendErrorMessage(payload, payload.recorderId);
@@ -394,6 +394,7 @@ export class PlugNMeetService implements OnModuleInit {
       if (roomInfo && conference) {
         conference.metadata.info = roomInfo.room_info;
       }
+      conference.ended = Date.now();
       conference.recorderId = null;
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);
