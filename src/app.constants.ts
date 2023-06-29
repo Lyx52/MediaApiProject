@@ -13,6 +13,7 @@ export const EVENT_MEDIAPACKAGE_RESOURCE_KEY = "event:mediapackages";
 // Microservice command patterns
 export const START_LIVEKIT_EGRESS_RECORDING = { cmd: "startLivekitEgressRecording" }
 export const START_EPIPHAN_RECORDING = { cmd: "startEpiphanRecording" }
+export const PING_EPIPHAN_DEVICE = { cmd: "pingEpiphan" }
 export const STOP_LIVEKIT_EGRESS_RECORDING = { cmd: "stopLivekitEgressRecording" }
 export const STOP_EPIPHAN_RECORDING = { cmd: "stopEpiphanRecording" }
 export const START_OPENCAST_EVENT = { cmd: "createOpencastEvent" }

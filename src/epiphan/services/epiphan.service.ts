@@ -19,6 +19,7 @@ import { CreateOrGetIngressStreamKeyDto } from "../../livekit/dto/CreateOrGetIng
 import { IngressInfo } from "livekit-server-sdk";
 import { RecordingDeviceDto } from "../dto/RecordingDeviceDto";
 import { EpiphanDto } from "../dto/EpiphanDto";
+import { PingEpiphanDto } from "../dto/PingEpiphanDto";
 @Injectable()
 export class EpiphanService {
   private readonly logger: Logger = new Logger(EpiphanService.name);
@@ -41,6 +42,35 @@ export class EpiphanService {
   }
   findConfig(epiphanId: string): EpiphanDto {
     return <EpiphanDto>this.epiphanDevices.find(cfg => cfg.identifier === epiphanId);
+  }
+  /**
+   * Pings epiphan device
+   * @param data
+   */
+  async pingEpiphanDevice(data: PingEpiphanDto): Promise<boolean> {
+    // 1. Find epiphan device
+    const epiphanConfig = await this.findConfig(data.epiphanId);
+
+    if (!epiphanConfig) {
+      this.logger.error(`Epiphan configuration with epiphanId ${data.epiphanId} not found!`)
+      return true;
+    }
+
+    // 2. Ping epiphan using API
+    try {
+      const headers = makeBasicAuthHeader(epiphanConfig.username, epiphanConfig.password);
+      const response: any = await firstValueFrom(this.httpService.get(
+        `${epiphanConfig.host}/api/system/status`, {
+          headers: headers
+        }).pipe(
+        map((response) => response.data),
+        handleAxiosExceptions(),
+      ));
+      return response && response.status == "ok";
+    } catch (e) {
+      this.logger.error(`Error while starting Epiphan livestream: ${e}`);
+    }
+    return false;
   }
   /**
    * Stops epiphan livestreams using epiphan API

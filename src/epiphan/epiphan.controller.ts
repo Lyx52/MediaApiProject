@@ -7,7 +7,7 @@ import {
   DOWNLOAD_VIDEO_JOB,
   EPIPHAN_SERVICE,
   START_EPIPHAN_RECORDING,
-  STOP_EPIPHAN_RECORDING, STOP_OPENCAST_EVENT
+  STOP_EPIPHAN_RECORDING, STOP_OPENCAST_EVENT, PING_EPIPHAN_DEVICE
 } from "../app.constants";
 import { StopEpiphanRecordingDto } from "./dto/StopEpiphanRecordingDto";
 import { InjectQueue } from "@nestjs/bull";
@@ -18,6 +18,7 @@ import { OpencastIngestType } from "../opencast/dto/enums/OpencastIngestType";
 import { firstValueFrom } from "rxjs";
 import { StopOpencastEventDto } from "../opencast/dto/StopOpencastEventDto";
 import { GetRecordingDevicesDto } from "./dto/GetRecordingDevicesDto";
+import { PingEpiphanDto } from "./dto/PingEpiphanDto";
 
 @Controller('epiphan')
 export class EpiphanController {
@@ -35,7 +36,10 @@ export class EpiphanController {
       devices: this.epiphanService.getAllDeviceLocations()
     };
   }
-
+  @MessagePattern(PING_EPIPHAN_DEVICE)
+  async pingEpiphan(@Body() data: PingEpiphanDto) {
+    return await this.epiphanService.pingEpiphanDevice(data);
+  }
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
     this.logger.debug("START_EPIPHAN_RECORDING");
