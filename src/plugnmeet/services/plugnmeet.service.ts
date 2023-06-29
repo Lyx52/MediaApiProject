@@ -5,6 +5,7 @@ import {ActiveRoomInfo, CreateRoomResponse, CreateRoomResponseRoomInfo, PlugNmee
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import {
+  CONFERENCE_MIN_AWAIT,
   PLUGNMEET_RECORDER_INFO_KEY, PLUGNMEET_ROOM_ENDED,
   PLUGNMEET_SERVICE,
   START_EPIPHAN_RECORDING,
@@ -189,6 +190,7 @@ export class PlugNMeetService implements OnModuleInit {
       await this.httpService.sendErrorMessage(payload);
       return;
     }
+    if (roomInfo.room_info.is_recording || !roomInfo.room_info.is_running) return;
     let conference = await this.conferenceRepository.findOne({ where: { roomSid: payload.roomSid } });
     const recorder = await this.recorderRepository.findOne({ where: { isRecording: { $in: [ false, 0 ]} } });
     if (!recorder) {
@@ -204,8 +206,7 @@ export class PlugNMeetService implements OnModuleInit {
        */
       conference = this.conferenceRepository.create();
       conference.metadata = <RoomMetadataDto>{
-        courseName: "Course_Series_2", // TODO: This course is for testing, remove this
-        //courseName: "PlugNMeet Conference",
+        courseName: "PlugNMeet Conference",
         info: <ActiveRoomInfo>roomInfo.room_info
       }
       conference.epiphanId = null;
@@ -214,11 +215,20 @@ export class PlugNMeetService implements OnModuleInit {
       conference.roomSid = payload.roomSid;
     } else {
       /**
+       * Check if conference has been stopped for longer than 15 seconds to await recorders/ingress to shutdown
+       */
+      if (Date.now() - conference.started < CONFERENCE_MIN_AWAIT)
+      {
+        this.logger.error(`Failed to start conference recording! Conference has not been stopped for longer than ${CONFERENCE_MIN_AWAIT / 1000} seconds`);
+        await this.httpService.sendErrorMessage(payload, payload.recorderId);
+        return;
+      }
+      /**
        *  For sanity’s sake we check if conference dosnt have active recorder
        */
       const activeRecorders = await this.recorderRepository.count({ where: { recorderId: conference.recorderId, isRecording: true } });
       if (activeRecorders > 0) {
-        this.logger.error('Failed to start livekit egress recording!');
+        this.logger.error('Failed to start conference recording! Conference has active recorders!');
         await this.httpService.sendErrorMessage(payload, payload.recorderId);
         return;
       }
@@ -226,6 +236,7 @@ export class PlugNMeetService implements OnModuleInit {
     conference.metadata.info = <ActiveRoomInfo>roomInfo.room_info;
     conference.recorderId = recorder.recorderId;
     conference.isActive = true;
+    conference.started = Date.now();
     /**
      *  Start egress recording, and await response
      */
@@ -329,6 +340,16 @@ export class PlugNMeetService implements OnModuleInit {
 
     const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId, isRecording: true } });
     if (recorder) {
+      /**
+       * Check if conference has been started for longer than 15 seconds to await recorders/ingress to start
+       */
+      if (Date.now() - conference.started > CONFERENCE_MIN_AWAIT)
+      {
+        this.logger.error(`Failed to stop conference recording! Conference has not been started for longer than ${CONFERENCE_MIN_AWAIT / 1000} seconds`);
+        await this.httpService.sendErrorMessage(payload, payload.recorderId);
+        return;
+      }
+
       /**
        *   Stop egress recording
        */

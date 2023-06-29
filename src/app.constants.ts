@@ -29,5 +29,4 @@ export const DOWNLOAD_VIDEO_JOB = 'DOWNLOAD_VIDEO_JOB';
 
 // Other constants
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';
-export const INGEST_JOB_RETRY = 3000;
-export const MEDIAPACKAGE_LOCK_TTL = 30_000;
+export const CONFERENCE_MIN_AWAIT = 15_000; // 15 Sec wait for everything to properly shutdown before able to start again.

@@ -20,4 +20,8 @@ export class ConferenceSession {
   metadata: RoomMetadataDto;
   @Column()
   isActive: boolean;
+  @Column()
+  started: number;
+  @Column()
+  ended: number;
 }
