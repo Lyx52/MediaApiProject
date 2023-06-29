@@ -5,7 +5,7 @@ import {ActiveRoomInfo, CreateRoomResponse, CreateRoomResponseRoomInfo, PlugNmee
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import {
-  CONFERENCE_MIN_AWAIT,
+  CONFERENCE_MIN_AWAIT, PING_EPIPHAN_DEVICE,
   PLUGNMEET_RECORDER_INFO_KEY, PLUGNMEET_ROOM_ENDED,
   PLUGNMEET_SERVICE,
   START_EPIPHAN_RECORDING,
@@ -30,6 +30,7 @@ import { CreateConferenceRoom } from "../dto/CreateConferenceRoom";
 import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
 import {RoomMetadataDto} from "../dto/RoomMetadataDto";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
+import { PingEpiphanDto } from "../../epiphan/dto/PingEpiphanDto";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -67,6 +68,20 @@ export class PlugNMeetService implements OnModuleInit {
     }
     return result;
   }
+  public pingEpiphanDevice = (epiphanId: string) =>
+    this.client.send<boolean, PingEpiphanDto>(PING_EPIPHAN_DEVICE, <PingEpiphanDto>{
+      epiphanId: epiphanId
+    });
+  public pingAllEpiphanDevices(epiphanIds: string[]) {
+    const epiphanDevicePings = epiphanIds.map(epiphanId => this.pingEpiphanDevice(epiphanId));
+    return Promise.all(epiphanDevicePings)
+      .then(results => {
+        return epiphanIds.map((device, index) => ({
+          device,
+          active: results[index]
+        }));
+      });
+  }
   async createConferenceRoom(payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
     const response = await this.PNMController.createRoom({
       room_id: payload.roomId,
@@ -75,17 +90,20 @@ export class PlugNMeetService implements OnModuleInit {
       max_participants:  payload.maxParticipants || this.config.get<number>('plugnmeet.max_room_participants') || 25
     });
     if (response.status) {
+      this.logger.log(`PlugNMeet create room status: ${response.msg}`);
       /**
        * Conference is added create it
        */
       const roomInfo = await this.PNMController.getActiveRoomInfo({room_id: payload.roomId});
       if (!roomInfo.status && !response.roomInfo) {
+        this.logger.error("Cannot create valid PlugNMeet room!");
         response.status = false;
         response.msg = "Cannot create valid PlugNMeet room!";
         return response;
       }
 
       if (!response.roomInfo) {
+
         response.roomInfo = <CreateRoomResponseRoomInfo><unknown>{
           ...roomInfo.room.room_info
         }
@@ -102,7 +120,9 @@ export class PlugNMeetService implements OnModuleInit {
         info: roomInfo.room.room_info || {}
       }
       await this.conferenceRepository.insert(entity);
+      this.logger.log(`PlugNMeet room ${response.roomInfo.sid} created!`);
     }
+
     return response;
   }
   async addRecorders(recorderCount: number) {
