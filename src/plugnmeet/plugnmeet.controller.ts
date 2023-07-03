@@ -1,5 +1,6 @@
 import {Body, Controller, Header, HttpCode, Inject, Logger, Post} from "@nestjs/common";
 import {
+  GET_CONFERENCE_SESSION,
   LIVEKIT_WEBHOOK_EVENT, PING_EPIPHAN_DEVICE,
   PLUGNMEET_SERVICE
 } from "../app.constants";
@@ -11,6 +12,8 @@ import {CreateRoomResponse, CreateRoomResponseRoomInfo} from "plugnmeet-sdk-js";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 import { PlugNMeetToRecorder, RecordingTasks } from "src/proto/plugnmeet_recorder_pb";
 import { PingEpiphanDto } from "../epiphan/dto/PingEpiphanDto";
+import { ConferenceSession } from "./entities/ConferenceSession";
+import { GetConferenceSessionDto } from "./dto/GetConferenceSessionDto";
 
 @Controller('plugnmeet')
 export class PlugNMeetController {
@@ -41,7 +44,10 @@ export class PlugNMeetController {
 
     return await this.pnmService.createConferenceRoom(payload);
   }
-
+  @MessagePattern(GET_CONFERENCE_SESSION)
+  async getConferenceInfo(@Payload() payload: GetConferenceSessionDto): Promise<ConferenceSession> {
+    return await this.pnmService.getConferenceSession(payload.roomSid);
+  }
   @EventPattern(LIVEKIT_WEBHOOK_EVENT)
   async handleLivekitWebhookEvents(@Body() data: WebhookEvent) {
     try {

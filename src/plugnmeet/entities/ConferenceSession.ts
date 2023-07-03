@@ -21,7 +21,9 @@ export class ConferenceSession {
   @Column()
   isActive: boolean;
   @Column()
-  started: number;
+  recordingStarted: number;
   @Column()
-  ended: number;
+  firstRecordingStarted: number;
+  @Column()
+  recordingEnded: number;
 }

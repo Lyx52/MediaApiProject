@@ -1,13 +1,15 @@
-import {Body, Controller, Get, Inject, Logger, UseGuards} from "@nestjs/common";
+import { Body, Controller, Get, Inject, Logger } from "@nestjs/common";
 import { EpiphanService } from "./services/epiphan.service";
 import { ClientProxy, EventPattern, MessagePattern } from "@nestjs/microservices";
 import { StartEpiphanRecordingDto } from "./dto/StartEpiphanRecordingDto";
 import {
-  START_OPENCAST_EVENT,
   DOWNLOAD_VIDEO_JOB,
   EPIPHAN_SERVICE,
+  PING_EPIPHAN_DEVICE,
   START_EPIPHAN_RECORDING,
-  STOP_EPIPHAN_RECORDING, STOP_OPENCAST_EVENT, PING_EPIPHAN_DEVICE
+  START_OPENCAST_EVENT,
+  STOP_EPIPHAN_RECORDING,
+  STOP_OPENCAST_EVENT
 } from "../app.constants";
 import { StopEpiphanRecordingDto } from "./dto/StopEpiphanRecordingDto";
 import { InjectQueue } from "@nestjs/bull";
@@ -61,9 +63,8 @@ export class EpiphanController {
       });
     } else {
       await this.client.emit(START_OPENCAST_EVENT, <StartOpencastEventDto>{
-        roomMetadata: data.roomMetadata,
-        recorderId: data.recorderId,
-        type: OpencastIngestType.PRESENTER
+        roomSid: data.roomMetadata.info.sid,
+        recorderId: data.recorderId
       });
     }
     return success;
@@ -76,8 +77,9 @@ export class EpiphanController {
     if (await this.epiphanService.stopEpiphanRecording(data) && data.ingestRecording) {
       // We send stop event message, wait for answer then start ingesting.
       if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
-        roomSid: data.roomMetadata.info.sid,
         recorderId: data.recorderId,
+        roomSid: data.roomMetadata.info.sid,
+        type: OpencastIngestType.PRESENTER
       }))) {
         await this.downloadQueue.add(DOWNLOAD_VIDEO_JOB, <DownloadJobDto>data);
       }

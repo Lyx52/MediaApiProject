@@ -10,4 +10,13 @@ export class StopEgressRecordingDto {
   @IsString()
   @IsNotEmpty()
   readonly recorderId: string;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly firstRecordingStarted: number;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly recordingStarted: number;
+  @IsNumber()
+  @IsNotEmpty()
+  readonly recordingEnded: number;
 }

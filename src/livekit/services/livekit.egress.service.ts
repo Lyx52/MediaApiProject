@@ -19,10 +19,14 @@ import { StartOpencastEventDto } from "../../opencast/dto/StartOpencastEventDto"
 import { StopOpencastEventDto } from "../../opencast/dto/StopOpencastEventDto";
 import { firstValueFrom } from "rxjs";
 import * as path from "path";
+import { sleep } from "../../common/utils/common.utils";
+import { PlugNmeet } from "plugnmeet-sdk-js";
+
 @Injectable()
 export class LivekitEgressService {
   private readonly logger = new Logger(LivekitEgressService.name);
   private readonly egressClient: EgressClient;
+  private readonly PNMController: PlugNmeet;
   private readonly recordingLocation: string;
   constructor(
     @Inject(LIVEKIT_EGRESS_SERVICE) private readonly client: ClientProxy,
@@ -33,6 +37,11 @@ export class LivekitEgressService {
       this.config.getOrThrow<string>("livekit.host"),
       this.config.getOrThrow<string>("livekit.key"),
       this.config.getOrThrow<string>("livekit.secret"),
+    );
+    this.PNMController = new PlugNmeet(
+      config.getOrThrow<string>('plugnmeet.host'),
+      config.getOrThrow<string>('plugnmeet.key'),
+      config.getOrThrow<string>('plugnmeet.secret'),
     );
     this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
   }
@@ -46,6 +55,7 @@ export class LivekitEgressService {
       if (await firstValueFrom(this.client.send(STOP_OPENCAST_EVENT, <StopOpencastEventDto> {
         roomSid: roomSid,
         recorderId: recorderId,
+        type: OpencastIngestType.ROOM_COMPOSITE
       }))) {
         // Add each file to opencast queue
         for (const file of files) {
@@ -56,7 +66,7 @@ export class LivekitEgressService {
             roomSid: roomSid,
             uri: path.resolve(file.filename),
             type: OpencastIngestType.ROOM_COMPOSITE,
-            ingested: Date.now()
+            ingested: Date.now(),
           });
         }
       }
@@ -70,7 +80,7 @@ export class LivekitEgressService {
       this.logger.error(`Failed to stop egress ${session.egressId}!`);
       if (retries <= 3) {
         // Await 1 second, maybe we are trying to stop the egress before it's been initialized.
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await sleep(1000);
         return this.stopEgressOrRetry(data, session, retries + 1);
       }
     }
@@ -118,9 +128,8 @@ export class LivekitEgressService {
         return false;
       }
       this.client.emit(START_OPENCAST_EVENT, <StartOpencastEventDto> {
-        roomMetadata: data.roomMetadata,
-        recorderId: data.recorderId,
-        type: OpencastIngestType.ROOM_COMPOSITE
+        roomSid: data.roomMetadata.info.sid,
+        recorderId: data.recorderId
       });
       return true;
     } catch (e) {

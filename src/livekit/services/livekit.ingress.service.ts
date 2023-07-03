@@ -17,6 +17,7 @@ import {
   IngressVideoEncodingPreset
 } from "livekit-server-sdk/dist/proto/livekit_ingress";
 import { PlugNMeetRoomEndedDto } from "../../plugnmeet/dto/PlugNMeetRoomEndedDto";
+import { sleep } from "../../common/utils/common.utils";
 
 @Injectable()
 export class LivekitIngressService {
@@ -42,7 +43,7 @@ export class LivekitIngressService {
     } catch (e) {
       this.logger.error(`Failed to stop ingress for room ${data.roomMetadata.info.room_id}!`);
       if (retries <= 3) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await sleep(1000);
         return this.deleteAllIngressSessionsOrRetry(data, retries + 1);
       }
     }

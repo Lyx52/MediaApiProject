@@ -4,10 +4,10 @@ import { OpencastIngestType } from "./enums/OpencastIngestType";
 import {RoomMetadataDto} from "../../plugnmeet/dto/RoomMetadataDto";
 
 export class StartOpencastEventDto {
-  @IsNotEmpty()
-  readonly roomMetadata: RoomMetadataDto;
   @IsString()
   @IsNotEmpty()
-  readonly recorderId: string; // EpiphanId or EgressId
-  readonly type: OpencastIngestType;
+  readonly roomSid: string;
+  @IsString()
+  @IsNotEmpty()
+  readonly recorderId: string;
 }

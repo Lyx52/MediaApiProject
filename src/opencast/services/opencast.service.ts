@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { StartOpencastEventDto } from "../dto/StartOpencastEventDto";
 import { ConfigService } from "@nestjs/config";
@@ -16,6 +16,10 @@ import * as fs from 'fs/promises';
 import { basename } from "path";
 import { toTitle } from "../dto/enums/OpencastIngestType";
 import { PlugNMeetRoomEndedDto } from "../../plugnmeet/dto/PlugNMeetRoomEndedDto";
+import { GET_CONFERENCE_SESSION, OPENCAST_SERVICE } from "../../app.constants";
+import { ClientProxy } from "@nestjs/microservices";
+import { ConferenceSession } from "../../plugnmeet/entities/ConferenceSession";
+import { GetConferenceSessionDto } from "../../plugnmeet/dto/GetConferenceSessionDto";
 @Injectable()
 export class OpencastService implements OnModuleInit {
   private readonly logger: Logger = new Logger(OpencastService.name);
@@ -25,6 +29,7 @@ export class OpencastService implements OnModuleInit {
   constructor(
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
+    @Inject(OPENCAST_SERVICE) private readonly client: ClientProxy,
     @InjectRepository(OpencastEvent) private readonly eventRepository: MongoRepository<OpencastEvent>,
   ) {
     this.host = this.config.getOrThrow<string>("opencast.host");
@@ -544,23 +549,27 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   };
-  async startRecordingEvent(data: StartOpencastEventDto) {
-    try {
-      let event = await this.createOrGetEvent(data);
-      event = await this.setCaptureAgentState(event, CaptureAgentState.CAPTURING);
-      event = await this.setRecordingEventState(event, OpencastRecordingState.CAPTURING);
-      await this.eventRepository.save(event);
-    } catch (e) {
-      this.logger.error(`Caught exception while creating event: ${e}!`);
-    }
-    // TODO: Maybe add some retry policy?
-  };
   async addIngestJob(job: IngestJobDto) {
     await this.eventRepository.updateOne(
-    { roomSid: job.roomSid, recorderId: job.recorderId },
-    { $push: { jobs: job } }
+      { roomSid: job.roomSid, recorderId: job.recorderId },
+      { $push: { jobs: job } }
     );
   }
+  async startRecordingEvent(data: StartOpencastEventDto) {
+    let event = await this.eventRepository.findOne({
+      where: { roomSid: data.roomSid, recorderId: data.recorderId }
+    });
+    /**
+     *  If event does not exist we ignore it, for example if we are starting first time there wont be an event.
+     */
+    if (!event) return;
+    event = await this.setCaptureAgentState(event, CaptureAgentState.CAPTURING);
+    event = await this.setRecordingEventState(event, OpencastRecordingState.CAPTURING);
+    event.end = new Date();
+    event.end.setTime(event.end.getTime() + 60000 * 60);
+    await this.updateEventScheduling(event);
+    await this.eventRepository.save(event);
+  };
   async stopAllRecordingEvents(data: PlugNMeetRoomEndedDto): Promise<void> {
     const events = await this.eventRepository.find({
       where: { roomSid: data.roomMetadata.info.sid }
@@ -575,6 +584,7 @@ export class OpencastService implements OnModuleInit {
       await this.deleteRecorder(event.recorderId);
     }
   }
+
   private async deleteRecorder(recorderId: string) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     await firstValueFrom(this.httpService.delete(`${this.host}/capture-admin/agents/${recorderId}`, {
@@ -621,24 +631,20 @@ export class OpencastService implements OnModuleInit {
     }
   }
   async stopRecordingEvent(data: StopOpencastEventDto): Promise<boolean> {
-    const event = await this.eventRepository.findOne({
-      where: { roomSid: data.roomSid, recorderId: data.recorderId },
-      order: { start: 'DESC' }
-    })
-    if (!event)
-    {
-      this.logger.error(`Event with recorder ${data.recorderId} dosn't exist!`);
-      return false;
+    try {
+      const event = await this.createOrGetEvent(data);
+      return this.stopRecordingEventByEntity(event);
+    } catch (e) {
+      this.logger.error(`Caught exception while creating or getting event: ${e}!`);
     }
-    return this.stopRecordingEventByEntity(event);
   }
-  async createOrGetEvent(data: StartOpencastEventDto): Promise<OpencastEvent> {
+  async createOrGetEvent(data: StopOpencastEventDto): Promise<OpencastEvent> {
     /**
      *  First we try to see if event exists AND if it already has eventId
      */
     let event = await this.eventRepository.findOne({
       where: {
-        roomSid: data.roomMetadata.info.sid,
+        roomSid: data.roomSid,
         recorderId: data.recorderId,
         eventId: {
           $ne: null,
@@ -646,29 +652,35 @@ export class OpencastService implements OnModuleInit {
         }
       }
     });
+    /**
+     * Update end time to current time and if its starting, then add 60 minutes to it
+     */
     if (event) {
-      /**
-       *  Event is started again, update scheduling
-       */
-      event.end.setTime(event.start.getTime() + 60000*30);
+      event.end = new Date();
       await this.updateEventScheduling(event);
-      return event;
+      return await this.eventRepository.save(event);
     }
     /**
      * Create event entity, it must be created everytime, because opencast events cannot be started/stopped
      */
+    const conference = await firstValueFrom(this.client.send<ConferenceSession, GetConferenceSessionDto>(GET_CONFERENCE_SESSION,<GetConferenceSessionDto>{
+      roomSid: data.roomSid
+    }));
+    if (!conference) throw 'Tried to create event, but conference doesn\'t exist!';
+
     event = this.eventRepository.create();
     event.recorderId = data.recorderId;
     event.type = data.type
-    event.roomSid = data.roomMetadata.info.sid;
+    event.roomSid = data.roomSid;
     event.start = new Date();
     event.end = new Date();
     event.jobs = [];
-    event.title = `${data.roomMetadata.info.room_title} ${toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
-    // 60 minutes
-    event.end.setTime(event.start.getTime() + 60000 * 60);
+    event.title = `${conference.metadata.info.room_title} ${toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
 
-    const series: any = await this.createOrGetSeriesByTitle(data.roomMetadata.courseName, `${data.roomMetadata.info.room_title} ${toTitle(data.type)}`);
+    // 1 minute (Since we start when ending the recording)
+    event.end.setTime(event.end.getTime() + 60000);
+
+    const series: any = await this.createOrGetSeriesByTitle(conference.metadata.courseName, `${conference.metadata.info.room_title} ${toTitle(data.type)}`);
     event.seriesId = series.identifier;
     /**
      * Add capture agent if dosnt exist, set it to idle for now
@@ -677,7 +689,7 @@ export class OpencastService implements OnModuleInit {
     /**
      *  Create MediaPackage and add DublinCore metadata to MediaPackage
      */
-    let mediaPackage = await this.createMediaPackageWithId(`${data.roomMetadata.info.sid}_${data.type}`);
+    let mediaPackage = await this.createMediaPackageWithId(`${conference.metadata.info.sid}_${data.type}`);
     mediaPackage = await this.addDublinCore(event, <string>mediaPackage);
     /**
      * Create recording
