@@ -1,6 +1,6 @@
 export enum CaptureAgentState {
-  CAPTURING,
-  INGESTING,
-  IDLE,
-  OFFLINE,
+  CAPTURING = "capturing",
+  INGESTING = "ingesting",
+  IDLE = "idle",
+  OFFLINE = "offline",
 }

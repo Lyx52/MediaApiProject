@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   ADD_OPENCAST_INGEST_JOB,
-  LIVEKIT_EGRESS_SERVICE,
+  LIVEKIT_EGRESS_SERVICE, START_INGESTING_VIDEOS,
   START_OPENCAST_EVENT,
   STOP_OPENCAST_EVENT
 } from "../../app.constants";
@@ -21,6 +21,7 @@ import { firstValueFrom } from "rxjs";
 import * as path from "path";
 import { sleep } from "../../common/utils/common.utils";
 import { PlugNmeet } from "plugnmeet-sdk-js";
+import {StartIngestingVideosDto} from "../../opencast/dto/StartIngestingVideosDto";
 
 @Injectable()
 export class LivekitEgressService {
@@ -48,7 +49,7 @@ export class LivekitEgressService {
 
   async ingestEgress(session: EgressInfo, roomSid: string, recorderId: string) {
     const files = session.fileResults;
-
+    const isActive = await this.PNMController.isRoomActive({ room_id: session.roomName });
     // Ingest only from active sessions, ignore starting sessions
     if (files) {
       // We send a message and wait for answer
@@ -66,7 +67,13 @@ export class LivekitEgressService {
             roomSid: roomSid,
             uri: path.resolve(file.filename),
             type: OpencastIngestType.ROOM_COMPOSITE,
-            ingested: Date.now(),
+            ingested: file.endedAt
+          });
+        }
+        if (!isActive.status)
+        {
+          await this.client.emit(START_INGESTING_VIDEOS, <StartIngestingVideosDto>{
+            roomSid: roomSid
           });
         }
       }
@@ -86,18 +93,29 @@ export class LivekitEgressService {
     }
   }
   async stopEgressRecording(data: StopEgressRecordingDto) {
-    const sessions = await this.egressClient.listEgress(data.roomMetadata.info.room_id);
     /**
      *  We only stop first one we find if there are more
      */
-    const egressSession = sessions.find(es =>
-      es.status == EgressStatus.EGRESS_ACTIVE ||
-      es.status == EgressStatus.EGRESS_STARTING)
+    const egressSession = await this.getActiveSession(data.roomMetadata.info.room_id);
     if (!egressSession) {
       this.logger.warn(`Tried to stop non existing or already stopped egress session for room ${data.roomMetadata.info.room_id}!`);
       return;
     }
     await this.stopEgressOrRetry(data, egressSession);
+  }
+  async getActiveSession(roomId: string): Promise<EgressInfo> {
+    const sessions = await this.egressClient.listEgress(roomId);
+    return sessions.find(es =>
+        es.status == EgressStatus.EGRESS_ACTIVE ||
+        es.status == EgressStatus.EGRESS_STARTING);
+  }
+  async getSessionCounts(roomId: string){
+    const sessions = await this.egressClient.listEgress(roomId);
+    const sessionCounts = {}
+    sessions.forEach(s => {
+      sessionCounts[s.status]++;
+    })
+    return sessionCounts;
   }
   async startEgressRecording(data: StartEgressRecordingDto): Promise<boolean> {
     const sessions = await this.egressClient.listEgress(data.roomMetadata.info.room_id);

@@ -23,7 +23,5 @@ export class ConferenceSession {
   @Column()
   recordingStarted: number;
   @Column()
-  firstRecordingStarted: number;
-  @Column()
   recordingEnded: number;
 }

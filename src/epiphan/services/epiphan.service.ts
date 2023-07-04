@@ -95,7 +95,7 @@ export class EpiphanService implements OnModuleInit {
       ));
       return { epiphanId: data.epiphanId, active: response && response.status == "ok", lastPinged: Date.now() };
     } catch (e) {
-      this.logger.error(`Error while starting Epiphan livestream: ${e}`);
+      this.logger.warn(`Epiphan device ${data.epiphanId} is unreachable!`);
     }
     return { epiphanId: data.epiphanId, active: false, lastPinged: Date.now() };
   }

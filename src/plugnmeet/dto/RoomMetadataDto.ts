@@ -1,4 +1,4 @@
-import {IsNotEmpty, IsString} from "class-validator";
+import {IsNotEmpty, IsNumber, IsString} from "class-validator";
 import {ActiveRoomInfo} from "plugnmeet-sdk-js";
 
 export class RoomMetadataDto {
@@ -9,9 +9,12 @@ export class RoomMetadataDto {
     courseName: string;
     @IsString()
     @IsNotEmpty()
-    readonly title: string;
+    title: string;
     @IsString()
     @IsNotEmpty()
-    readonly organizer: string;
+    organizer: string;
+    @IsNumber()
+    @IsNotEmpty()
+    recordingCount: number;
 }
 

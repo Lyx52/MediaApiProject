@@ -33,6 +33,7 @@ import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 import { PingEpiphanDto } from "../../epiphan/dto/PingEpiphanDto";
 import { PingEpiphanResDto } from "../../epiphan/dto/PingEpiphanResDto";
 import { sleep } from "../../common/utils/common.utils";
+import e from "express";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -114,9 +115,12 @@ export class PlugNMeetService implements OnModuleInit {
       entity.roomId = payload.roomId;
       entity.roomSid = response.roomInfo.sid;
       entity.recorderId = null;
+      entity.recordingStarted = -1;
+      entity.recordingEnded = -1;
       entity.metadata = <RoomMetadataDto>{
         courseName: payload.opencastSeriesId,
-        info: roomInfo.room.room_info || {}
+        info: roomInfo.room.room_info || {},
+        recordingCount: 0
       }
       await this.conferenceRepository.insert(entity);
       this.logger.log(`PlugNMeet room ${response.roomInfo.sid} created!`);
@@ -226,7 +230,8 @@ export class PlugNMeetService implements OnModuleInit {
       conference = this.conferenceRepository.create();
       conference.metadata = <RoomMetadataDto>{
         courseName: "PlugNMeet Conference",
-        info: <ActiveRoomInfo>roomInfo.room_info
+        info: <ActiveRoomInfo>roomInfo.room_info,
+        recordingCount: 0
       }
       conference.epiphanId = null;
       conference.recorderId = recorder.recorderId;
@@ -236,7 +241,7 @@ export class PlugNMeetService implements OnModuleInit {
       /**
        * Check if conference has been stopped,
        */
-      if ((Date.now() - conference.recordingEnded) < CONFERENCE_MIN_AWAIT || conference.recordingEnded < 0)
+      if ((Date.now() - conference.recordingEnded) < CONFERENCE_MIN_AWAIT && conference.recordingEnded > 0)
       {
         this.logger.error(`Failed to start conference recording! Conference has not been ended for longer than ${CONFERENCE_MIN_AWAIT / 1000} seconds`);
         await this.httpService.sendErrorMessage(payload, payload.recorderId);
@@ -256,9 +261,7 @@ export class PlugNMeetService implements OnModuleInit {
     conference.recorderId = recorder.recorderId;
     conference.isActive = true;
     conference.recordingStarted = Date.now();
-    conference.recordingEnded = -1;
-    if (!conference.firstRecordingStarted)
-      conference.firstRecordingStarted = Date.now();
+    conference.recordingEnded = -1
     /**
      *  Start egress recording, and await response
      */
@@ -305,7 +308,7 @@ export class PlugNMeetService implements OnModuleInit {
   }
 
   async handleRoomEnded(payload: WebhookEvent): Promise<void> {
-    const conference = await this.getConferenceSession(payload.room.sid);
+    let conference = await this.getConferenceSession(payload.room.sid);
     if (!conference) return;
     const recorder = await this.recorderRepository.findOne({ where: { recorderId: conference.recorderId, isRecording: true } });
     conference.recordingEnded = Date.now();
@@ -313,7 +316,7 @@ export class PlugNMeetService implements OnModuleInit {
     /**
      * We dispose of recordings which are < 15 secs
      */
-    const disposeRecording = (Date.now() - conference.recordingStarted) < CONFERENCE_MIN_AWAIT;
+    const disposeRecording = !conference.recordingStarted || (Date.now() - conference.recordingStarted) < CONFERENCE_MIN_AWAIT;
     if (recorder) {
       /**
        *   Stop egress recording
@@ -321,10 +324,7 @@ export class PlugNMeetService implements OnModuleInit {
       await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
         roomMetadata: conference.metadata,
         ingestRecording: !disposeRecording,
-        recorderId: `ROOM_COMPOSITE_${conference.roomSid}`,
-        firstRecordingStarted: conference.firstRecordingStarted,
-        recordingStarted: conference.recordingStarted,
-        recordingEnded: conference.recordingEnded
+        recorderId: `ROOM_COMPOSITE_${conference.roomSid}`
       });
 
       /**
@@ -335,16 +335,14 @@ export class PlugNMeetService implements OnModuleInit {
           roomMetadata: conference.metadata,
           epiphanId: conference.epiphanId,
           ingestRecording: !disposeRecording,
-          recorderId: `${recorder.recorderId}_PRESENTER_${conference.roomSid}`,
-          firstRecordingStarted: conference.firstRecordingStarted,
-          recordingStarted: conference.recordingStarted,
-          recordingEnded: conference.recordingEnded
+          recorderId: `${recorder.recorderId}_PRESENTER_${conference.roomSid}`
         });
       }
 
       /**
        *  Update entities
        */
+      conference.metadata.recordingCount++;
       recorder.isRecording = false;
       await this.recorderRepository.save(recorder);
       await this.addAvailableRecorder(recorder.recorderId);
@@ -352,11 +350,10 @@ export class PlugNMeetService implements OnModuleInit {
 
     conference.isActive = false;
     conference.recorderId = null;
-    await this.conferenceRepository.save(conference);
-
-    await this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-      roomMetadata: conference.metadata
-    });
+    conference = await this.conferenceRepository.save(conference);
+      await this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
+        roomMetadata: conference.metadata
+      });
   }
 
   async stopRecording(payload: PlugNMeetToRecorder) {
@@ -380,7 +377,7 @@ export class PlugNMeetService implements OnModuleInit {
     /**
      * We dispose of recordings which are < 15 secs
      */
-    const disposeRecording = (Date.now() - conference.recordingStarted) < CONFERENCE_MIN_AWAIT;
+    const disposeRecording = !conference.recordingStarted || (Date.now() - conference.recordingStarted) < CONFERENCE_MIN_AWAIT;
     if (recorder) {
       /**
        *   Stop egress recording
@@ -388,10 +385,7 @@ export class PlugNMeetService implements OnModuleInit {
       await this.client.emit(STOP_LIVEKIT_EGRESS_RECORDING, <StopEgressRecordingDto>{
         roomMetadata: conference.metadata,
         ingestRecording: !disposeRecording,
-        recorderId: `ROOM_COMPOSITE_${conference.roomSid}`,
-        firstRecordingStarted: conference.firstRecordingStarted,
-        recordingStarted: conference.recordingStarted,
-        recordingEnded: conference.recordingEnded
+        recorderId: `ROOM_COMPOSITE_${conference.roomSid}`
       });
 
       /**
@@ -402,10 +396,7 @@ export class PlugNMeetService implements OnModuleInit {
           roomMetadata: conference.metadata,
           epiphanId: conference.epiphanId,
           ingestRecording: !disposeRecording,
-          recorderId: `PRESENTER_${conference.roomSid}`,
-          firstRecordingStarted: conference.firstRecordingStarted,
-          recordingStarted: conference.recordingStarted,
-          recordingEnded: conference.recordingEnded
+          recorderId: `PRESENTER_${conference.roomSid}`
         });
       }
       await sleep(3000);
@@ -419,6 +410,7 @@ export class PlugNMeetService implements OnModuleInit {
       }
 
       recorder.isRecording = false;
+      conference.metadata.recordingCount++;
       await this.recorderRepository.save(recorder);
       await this.addAvailableRecorder(recorder.recorderId);
     }

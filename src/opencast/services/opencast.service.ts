@@ -7,7 +7,7 @@ import { handleAxiosExceptions, retryPolicy } from "../../common/utils/axios.uti
 import { CaptureAgentState } from "../dto/enums/CaptureAgentState";
 import { OpencastRecordingState } from "../dto/enums/OpencastRecordingState";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOneAndReplaceOption, MongoRepository } from "typeorm";
+import { MongoRepository } from "typeorm";
 import { ObjectID } from "mongodb";
 import { OpencastEvent } from "../entities/opencast.event";
 import { StopOpencastEventDto } from "../dto/StopOpencastEventDto";
@@ -16,10 +16,13 @@ import * as fs from 'fs/promises';
 import { basename } from "path";
 import { toTitle } from "../dto/enums/OpencastIngestType";
 import { PlugNMeetRoomEndedDto } from "../../plugnmeet/dto/PlugNMeetRoomEndedDto";
-import { GET_CONFERENCE_SESSION, OPENCAST_SERVICE } from "../../app.constants";
+import {GET_CONFERENCE_SESSION, INGEST_MEDIAPACKAGE_JOB, OPENCAST_SERVICE} from "../../app.constants";
 import { ClientProxy } from "@nestjs/microservices";
 import { ConferenceSession } from "../../plugnmeet/entities/ConferenceSession";
 import { GetConferenceSessionDto } from "../../plugnmeet/dto/GetConferenceSessionDto";
+import {InjectQueue} from "@nestjs/bull";
+import {Queue} from "bull";
+import {IngestMediaPackageJobDto} from "../dto/IngestMediaPackageJobDto";
 @Injectable()
 export class OpencastService implements OnModuleInit {
   private readonly logger: Logger = new Logger(OpencastService.name);
@@ -30,6 +33,7 @@ export class OpencastService implements OnModuleInit {
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
     @Inject(OPENCAST_SERVICE) private readonly client: ClientProxy,
+    @InjectQueue('video') private ingestQueue: Queue,
     @InjectRepository(OpencastEvent) private readonly eventRepository: MongoRepository<OpencastEvent>,
   ) {
     this.host = this.config.getOrThrow<string>("opencast.host");
@@ -65,6 +69,19 @@ export class OpencastService implements OnModuleInit {
     } catch (e) {
       this.logger.error(`Error while initializing opencast service module \n  ${e}`);
     }
+  }
+  async getRecordingStatuses()
+  {
+    const headers = this.makeAuthHeader();
+    return firstValueFrom(this.httpService.get(`${this.host}/recordings/recordingStatus`, {
+      headers: headers
+    }).pipe(
+        map((response) => {
+          return response.data
+        }),
+        retryPolicy(),
+        handleAxiosExceptions(),
+    ));
   }
 
   async findEventById(id: string) {
@@ -145,8 +162,8 @@ export class OpencastService implements OnModuleInit {
     const headers = this.makeAuthHeader('multipart/form-data');
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/addTrack`, data, {
       headers: headers,
-      maxContentLength: videoFile.length * 2,
-      maxBodyLength: videoFile.length * 2
+      maxContentLength: videoFile.length * 1.15,
+      maxBodyLength: videoFile.length * 1.15
     }).pipe(
       map((response) => response.data.toString()),
       retryPolicy(),
@@ -368,7 +385,7 @@ export class OpencastService implements OnModuleInit {
     state = CaptureAgentState.IDLE,
   ) {
     const params = new URLSearchParams();
-    params.set('state', CaptureAgentState[state].toString().toLowerCase());
+    params.set('state', state);
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${event.recorderId}`, {},{
       headers: headers,
@@ -383,7 +400,7 @@ export class OpencastService implements OnModuleInit {
   };
   async setRecordingEventState(event: OpencastEvent, state: OpencastRecordingState) {
     const params = new URLSearchParams();
-    params.set('state', OpencastRecordingState[state].toString().toLowerCase());
+    params.set('state', state);
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     await firstValueFrom(this.httpService.put(`${this.host}/recordings/${event.eventId}/recordingStatus`, {},{
       headers: headers,
@@ -555,6 +572,22 @@ export class OpencastService implements OnModuleInit {
       { $push: { jobs: job } }
     );
   }
+  async ingestPendingEvents(data: PlugNMeetRoomEndedDto) {
+    const eventStatuses: any = await this.getRecordingStatuses();
+    const roomEvents = await this.eventRepository.find({
+      where: { roomSid: data.roomMetadata.info.sid }
+    });
+    for (const event of roomEvents)
+    {
+      const eventStatus: any = eventStatuses.find(e => e.id === event.eventId);
+      if (eventStatus?.state === OpencastRecordingState.CAPTURE_FINISHED) {
+        await this.ingestQueue.add(INGEST_MEDIAPACKAGE_JOB, <IngestMediaPackageJobDto>{
+          roomMetadata: data.roomMetadata
+        });
+      }
+    }
+
+  }
   async startRecordingEvent(data: StartOpencastEventDto) {
     let event = await this.eventRepository.findOne({
       where: { roomSid: data.roomSid, recorderId: data.recorderId }
@@ -570,22 +603,23 @@ export class OpencastService implements OnModuleInit {
     await this.updateEventScheduling(event);
     await this.eventRepository.save(event);
   };
-  async stopAllRecordingEvents(data: PlugNMeetRoomEndedDto): Promise<void> {
+  async stopAllRecordingEvents(data: PlugNMeetRoomEndedDto): Promise<number> {
     const events = await this.eventRepository.find({
       where: { roomSid: data.roomMetadata.info.sid }
     });
     if (events.length <= 0) {
       this.logger.warn(`There are no events for conference ${data.roomMetadata.info.sid}!`)
-      return;
+      return 0;
     }
     for (const event of events)
     {
       await this.stopRecordingEventByEntity(event);
       await this.deleteRecorder(event.recorderId);
     }
+    return events.length;
   }
 
-  private async deleteRecorder(recorderId: string) {
+  public async deleteRecorder(recorderId: string) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     await firstValueFrom(this.httpService.delete(`${this.host}/capture-admin/agents/${recorderId}`, {
       headers: headers
@@ -620,7 +654,6 @@ export class OpencastService implements OnModuleInit {
        */
       event = await this. setRecordingEventState(event, OpencastRecordingState.CAPTURE_FINISHED);
       event = await this.setCaptureAgentState(event, CaptureAgentState.IDLE);
-      event = await this.setRecordingEventState(event, OpencastRecordingState.UPLOADING);
       event.end = new Date();
       await this.updateEventScheduling(event);
       await this.eventRepository.save(event);

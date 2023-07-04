@@ -1,6 +1,6 @@
 import {Body, Controller, Inject, Headers, Logger, Post, Req, Request, RawBodyRequest, Header} from "@nestjs/common";
 import {
-  CREATE_OR_GET_INGRESS_STREAM_KEY,
+  CREATE_OR_GET_INGRESS_STREAM_KEY, GET_EVENT_STATUS,
   LIVEKIT_SERVICE, LIVEKIT_WEBHOOK_EVENT,
   PLUGNMEET_ROOM_ENDED,
   START_LIVEKIT_EGRESS_RECORDING,
@@ -14,7 +14,7 @@ import { LivekitIngressService } from "./services/livekit.ingress.service";
 import { CreateOrGetIngressStreamKeyDto } from "./dto/CreateOrGetIngressStreamKeyDto";
 import { PlugNMeetRoomEndedDto } from "../plugnmeet/dto/PlugNMeetRoomEndedDto";
 import {ConfigService} from "@nestjs/config";
-import { EgressClient, IngressInfo, WebhookReceiver } from "livekit-server-sdk";
+import { IngressInfo, WebhookReceiver } from "livekit-server-sdk";
 import { WebhookEvent } from "livekit-server-sdk/dist/proto/livekit_webhook";
 import {Public} from "../common/utils/decorators/public.decorator";
 @Controller('livekit')
@@ -37,6 +37,7 @@ export class LivekitController {
     try {
       switch(data.event) {
         case "egress_ended":
+          this.logger.debug("LIVEKIT:EGRESS_ENDED");
           await this.egressService.ingestEgress(data.egressInfo, data.egressInfo.roomId, `ROOM_COMPOSITE_${data.egressInfo.roomId}`);
           break;
       }
@@ -79,11 +80,13 @@ export class LivekitController {
       data: ingressSession
     }
   }
+
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {
-    this.logger.debug("PLUGNMEET_ROOM_ENDED");
+    this.logger.debug("LIVEKIT:PLUGNMEET_ROOM_ENDED");
     await this.ingressService.deleteAllIngressSessionsOrRetry(data);
   }
+
   @EventPattern(STOP_LIVEKIT_EGRESS_RECORDING)
   async stopEgressRecording(@Body() data: StopEgressRecordingDto) {
     this.logger.debug("STOP_LIVEKIT_EGRESS_RECORDING");

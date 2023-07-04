@@ -3,7 +3,7 @@ import { Job, JobStatus } from "bull";
 import { Inject, Logger } from "@nestjs/common";
 import {
   ADD_OPENCAST_INGEST_JOB,
-  DOWNLOAD_VIDEO_JOB, EPIPHAN_SERVICE
+  DOWNLOAD_VIDEO_JOB, EPIPHAN_SERVICE, START_OPENCAST_EVENT
 } from "../../app.constants";
 import { DownloadJobDto } from "../dto/DownloadJobDto";
 import { ClientProxy } from "@nestjs/microservices";
@@ -21,10 +21,13 @@ import { OpencastIngestType } from "../../opencast/dto/enums/OpencastIngestType"
 import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import * as path from "path";
+import {StartIngestingVideosDto} from "../../opencast/dto/StartIngestingVideosDto";
+import {PlugNmeet} from "plugnmeet-sdk-js";
 @Processor('download')
 export class EpiphanDownloadConsumer {
   private readonly logger: Logger = new Logger(EpiphanDownloadConsumer.name);
   private readonly recordingLocation: string;
+  private readonly PNMController: PlugNmeet;
   constructor(
     private readonly epiphanService: EpiphanService,
     private readonly config: ConfigService,
@@ -32,6 +35,11 @@ export class EpiphanDownloadConsumer {
     @Inject(EPIPHAN_SERVICE) private readonly client: ClientProxy
   ) {
     this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
+    this.PNMController = new PlugNmeet(
+        config.getOrThrow<string>('plugnmeet.host'),
+        config.getOrThrow<string>('plugnmeet.key'),
+        config.getOrThrow<string>('plugnmeet.secret'),
+    );
   }
   @Process(DOWNLOAD_VIDEO_JOB)
   async downloadVideo(job: Job<DownloadJobDto>) {
@@ -85,12 +93,19 @@ export class EpiphanDownloadConsumer {
 
         if (success) {
           this.logger.debug(`File downloaded successfully to ${uploadLocation}`);
+          const isActive = await this.PNMController.isRoomActive({ room_id: job.data.roomMetadata.info.room_id });
           await this.client.emit(ADD_OPENCAST_INGEST_JOB, <IngestJobDto>{
             recorderId: job.data.recorderId,
             roomSid: job.data.roomMetadata.info.sid,
             uri: uploadLocation,
             ingested: Date.now()
           });
+          if (!isActive)
+          {
+            await this.client.emit(START_OPENCAST_EVENT, <StartIngestingVideosDto>{
+              roomSid: job.data.roomMetadata.info.sid
+            });
+          }
           await job.moveToCompleted();
           return;
         }
