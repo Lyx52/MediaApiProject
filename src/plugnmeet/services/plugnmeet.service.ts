@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleInit, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
 import {ActiveRoomInfo, CreateRoomResponse, CreateRoomResponseRoomInfo, PlugNmeet, Room} from "plugnmeet-sdk-js";
@@ -34,6 +34,7 @@ import { PingEpiphanDto } from "../../epiphan/dto/PingEpiphanDto";
 import { PingEpiphanResDto } from "../../epiphan/dto/PingEpiphanResDto";
 import { sleep } from "../../common/utils/common.utils";
 import e from "express";
+import { ActiveConferenceSession } from "../../opencast/dto/ActiveConferenceSession";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -79,6 +80,31 @@ export class PlugNMeetService implements OnModuleInit {
     const epiphanDevicePings = epiphanIds.map(epiphanId => this.pingEpiphanDevice(epiphanId));
     return Promise.all(epiphanDevicePings);
   }
+  async getActiveConferenceRooms(): Promise<ActiveConferenceSession[]> {
+    const rooms = await this.conferenceRepository.find({ where: { isActive: true } });
+    return rooms.map(r => <ActiveConferenceSession>{
+      id: r.roomSid,
+      title: r.metadata.title,
+      livestreams: [] // TODO: Implement livestreams
+    });
+  }
+  async getActiveConferenceRoom(id: string): Promise<ActiveConferenceSession> {
+    const room = await this.conferenceRepository.findOne({ where: { roomSid: id } });
+    if (!room) throw new NotFoundException(`Konference ${id} nav atrasta!`);
+    return <ActiveConferenceSession>{
+      id: room.roomSid,
+      title: room.metadata.title,
+      livestreams: [] // TODO: Implement livestreams
+    };
+  }
+  async startLivestream(roomId: string, epiphanId: string) {
+    return true; // TODO: Implement livestreams
+  }
+
+  async stopLivestream(roomId: string, epiphanId: string) {
+    return true; // TODO: Implement livestreams
+  }
+
   async getConferenceSession(roomSid: string): Promise<ConferenceSession> {
     return await this.conferenceRepository.findOne({ where: { roomSid: roomSid } });
   }
@@ -261,7 +287,7 @@ export class PlugNMeetService implements OnModuleInit {
     conference.recorderId = recorder.recorderId;
     conference.isActive = true;
     conference.recordingStarted = Date.now();
-    conference.recordingEnded = -1
+    conference.recordingEnded = -1;
     /**
      *  Start egress recording, and await response
      */
@@ -351,9 +377,9 @@ export class PlugNMeetService implements OnModuleInit {
     conference.isActive = false;
     conference.recorderId = null;
     conference = await this.conferenceRepository.save(conference);
-      await this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
-        roomMetadata: conference.metadata
-      });
+    await this.client.emit(PLUGNMEET_ROOM_ENDED, <PlugNMeetRoomEndedDto>{
+      roomMetadata: conference.metadata
+    });
   }
 
   async stopRecording(payload: PlugNMeetToRecorder) {
