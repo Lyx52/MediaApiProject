@@ -5,7 +5,5 @@ import { OpencastIngestType } from "./enums/OpencastIngestType";
 export class ActiveConferenceSession {
   readonly id: string;
   readonly title: string;
-  readonly isActive: boolean;
-  readonly livestreams: any[];
 }
 

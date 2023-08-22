@@ -12,6 +12,8 @@ export const PLUGNMEET_RECORDER_INFO_KEY = 'pnm:recorders';
 // Microservice command patterns
 export const START_LIVEKIT_EGRESS_RECORDING = { cmd: "startLivekitEgressRecording" }
 export const START_EPIPHAN_RECORDING = { cmd: "startEpiphanRecording" }
+export const START_EPIPHAN_LIVESTREAM = { cmd: "startEpiphanLivestream" }
+export const STOP_EPIPHAN_LIVESTREAM = { cmd: "stopEpiphanLivestream" }
 export const PING_EPIPHAN_DEVICE = { cmd: "pingEpiphan" }
 export const STOP_LIVEKIT_EGRESS_RECORDING = { cmd: "stopLivekitEgressRecording" }
 export const STOP_EPIPHAN_RECORDING = { cmd: "stopEpiphanRecording" }

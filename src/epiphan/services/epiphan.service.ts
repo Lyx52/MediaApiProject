@@ -21,6 +21,7 @@ import { RecordingDeviceDto } from "../dto/RecordingDeviceDto";
 import { EpiphanDto } from "../dto/EpiphanDto";
 import { PingEpiphanDto } from "../dto/PingEpiphanDto";
 import { PingEpiphanResDto } from "../dto/PingEpiphanResDto";
+import { StartEpiphanLivestreamDto } from "../dto/StartEpiphanLivestreamDto";
 @Injectable()
 export class EpiphanService implements OnModuleInit {
   private readonly logger: Logger = new Logger(EpiphanService.name);
@@ -105,7 +106,7 @@ export class EpiphanService implements OnModuleInit {
    *  2. Stops epiphan livestream using API
    * @param data
    */
-  async stopEpiphanLivestream(data: StopEpiphanRecordingDto): Promise<boolean> {
+  async stopEpiphanLivestream(data: StartEpiphanLivestreamDto): Promise<boolean> {
     let success = true;
 
     // 1. Find epiphan device
@@ -294,7 +295,7 @@ export class EpiphanService implements OnModuleInit {
    *  3. Updates epiphan rtmp livestream config including the streamkey
    * @param data
    */
-  async startEpiphanLivestream(data: StartEpiphanRecordingDto): Promise<boolean> {
+  async startEpiphanLivestream(data: StartEpiphanLivestreamDto): Promise<boolean> {
     let success = true;
 
     // 1. Find epiphan device

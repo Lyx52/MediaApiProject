@@ -1,7 +1,7 @@
 import {IsEnum, IsNotEmpty, IsNumber, IsString} from "class-validator";
 import { RooMetadata } from "plugnmeet-sdk-js";
 
-export class CreateConferenceRoom {
+export class CreateConferenceRoomDto {
   @IsString()
   @IsNotEmpty()
   readonly epiphanDevices: string[];

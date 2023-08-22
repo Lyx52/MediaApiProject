@@ -5,9 +5,9 @@ import { StartEpiphanRecordingDto } from "./dto/StartEpiphanRecordingDto";
 import {
   DOWNLOAD_VIDEO_JOB,
   EPIPHAN_SERVICE,
-  PING_EPIPHAN_DEVICE,
+  PING_EPIPHAN_DEVICE, START_EPIPHAN_LIVESTREAM,
   START_EPIPHAN_RECORDING,
-  START_OPENCAST_EVENT,
+  START_OPENCAST_EVENT, STOP_EPIPHAN_LIVESTREAM,
   STOP_EPIPHAN_RECORDING,
   STOP_OPENCAST_EVENT
 } from "../app.constants";
@@ -21,6 +21,8 @@ import { firstValueFrom } from "rxjs";
 import { StopOpencastEventDto } from "../opencast/dto/StopOpencastEventDto";
 import { GetRecordingDevicesDto } from "./dto/GetRecordingDevicesDto";
 import { PingEpiphanDto } from "./dto/PingEpiphanDto";
+import { StartEpiphanLivestreamDto } from "./dto/StartEpiphanLivestreamDto";
+import { StopEpiphanLivestreamDto } from "./dto/StopEpiphanLivestreamDto";
 
 @Controller('epiphan')
 export class EpiphanController {
@@ -42,6 +44,15 @@ export class EpiphanController {
   async pingEpiphan(@Body() data: PingEpiphanDto) {
     return await this.epiphanService.pingEpiphanDevice(data);
   }
+  @MessagePattern(START_EPIPHAN_LIVESTREAM)
+  async startEpiphanLivestream(@Body() data: StartEpiphanLivestreamDto) {
+    return await this.epiphanService.startEpiphanLivestream(data);
+  }
+  @MessagePattern(STOP_EPIPHAN_LIVESTREAM)
+  async stopEpiphanLivestream(@Body() data: StopEpiphanLivestreamDto) {
+    return await this.epiphanService.stopEpiphanLivestream(data);
+  }
+
   @MessagePattern(START_EPIPHAN_RECORDING)
   async startEpiphanRecording(@Body() data: StartEpiphanRecordingDto) {
     this.logger.debug("START_EPIPHAN_RECORDING");

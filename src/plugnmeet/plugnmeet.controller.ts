@@ -7,7 +7,7 @@ import {
 import {ClientProxy, Ctx, EventPattern, MessagePattern, Payload} from "@nestjs/microservices";
 import { PlugNMeetService } from "./services/plugnmeet.service";
 import { PlugNMeetHttpService } from "./services/plugnmeet.http.service";
-import { CreateConferenceRoom } from "./dto/CreateConferenceRoom";
+import { CreateConferenceRoomDto } from "./dto/CreateConferenceRoomDto";
 import {CreateRoomResponse, CreateRoomResponseRoomInfo} from "plugnmeet-sdk-js";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
 import { PlugNMeetToRecorder, RecordingTasks } from "src/proto/plugnmeet_recorder_pb";
@@ -27,7 +27,7 @@ export class PlugNMeetController {
   @Post()
   @HttpCode(200)
   @Header('Cache-Control', 'none')
-  async createConferenceRoom(@Body() payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
+  async createConferenceRoom(@Body() payload: CreateConferenceRoomDto): Promise<CreateRoomResponse> {
     if (payload.epiphanDevices && payload.epiphanDevices.length > 0) {
       // Promise await all then check if all result in success
       const pingResults = await this.pnmService.pingAllEpiphanDevices(payload.epiphanDevices);
@@ -52,6 +52,11 @@ export class PlugNMeetController {
   @Get(':roomId')
   async getActiveConferenceRoom(@Param('roomId') id: string) {
     return await this.pnmService.getActiveConferenceRoom(id)
+  }
+
+  @Get(':roomId/status')
+  async getActiveConferenceRoomStatus(@Param('roomId') id: string) {
+    return await this.pnmService.getConferenceRoomStatus(id)
   }
 
   @Post(':roomId/livestream/:epiphanId/start')

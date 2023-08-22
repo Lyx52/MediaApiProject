@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, OnModuleInit, NotFoundException } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  NotFoundException,
+  InternalServerErrorException
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
 import {ActiveRoomInfo, CreateRoomResponse, CreateRoomResponseRoomInfo, PlugNmeet, Room} from "plugnmeet-sdk-js";
@@ -7,9 +14,9 @@ import Redis from "ioredis";
 import {
   CONFERENCE_MIN_AWAIT, PING_EPIPHAN_DEVICE,
   PLUGNMEET_RECORDER_INFO_KEY, PLUGNMEET_ROOM_ENDED,
-  PLUGNMEET_SERVICE,
+  PLUGNMEET_SERVICE, START_EPIPHAN_LIVESTREAM,
   START_EPIPHAN_RECORDING,
-  START_LIVEKIT_EGRESS_RECORDING,
+  START_LIVEKIT_EGRESS_RECORDING, START_OPENCAST_EVENT, STOP_EPIPHAN_LIVESTREAM,
   STOP_EPIPHAN_RECORDING,
   STOP_LIVEKIT_EGRESS_RECORDING
 } from "../../app.constants";
@@ -26,7 +33,7 @@ import { StopEgressRecordingDto } from "../../livekit/dto/StopEgressRecordingDto
 import { PlugNMeetHttpService } from "./plugnmeet.http.service";
 import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
 import { ConferenceSession } from "../entities/ConferenceSession";
-import { CreateConferenceRoom } from "../dto/CreateConferenceRoom";
+import { CreateConferenceRoomDto } from "../dto/CreateConferenceRoomDto";
 import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
 import {RoomMetadataDto} from "../dto/RoomMetadataDto";
 import {WebhookEvent} from "livekit-server-sdk/dist/proto/livekit_webhook";
@@ -35,6 +42,10 @@ import { PingEpiphanResDto } from "../../epiphan/dto/PingEpiphanResDto";
 import { sleep } from "../../common/utils/common.utils";
 import e from "express";
 import { ActiveConferenceSession } from "../../opencast/dto/ActiveConferenceSession";
+import { ConferenceRoomActiveDto } from "../dto/ConferenceRoomActiveDto";
+import { ConferenceRoomLivestreamDto } from "../dto/ConferenceRoomLivestreamDto";
+import { StartEpiphanLivestreamDto } from "../../epiphan/dto/StartEpiphanLivestreamDto";
+import { StopEpiphanLivestreamDto } from "../../epiphan/dto/StopEpiphanLivestreamDto";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -84,8 +95,7 @@ export class PlugNMeetService implements OnModuleInit {
     const rooms = await this.conferenceRepository.find({ where: { isActive: true } });
     return rooms.map(r => <ActiveConferenceSession>{
       id: r.roomSid,
-      title: r.metadata.title,
-      livestreams: [] // TODO: Implement livestreams
+      title: r.metadata.title
     });
   }
   async getActiveConferenceRoom(id: string): Promise<ActiveConferenceSession> {
@@ -93,22 +103,58 @@ export class PlugNMeetService implements OnModuleInit {
     if (!room) throw new NotFoundException(`Konference ${id} nav atrasta!`);
     return <ActiveConferenceSession>{
       id: room.roomSid,
-      title: room.metadata.title,
-      livestreams: [] // TODO: Implement livestreams
+      title: room.metadata.title
     };
   }
-  async startLivestream(roomId: string, epiphanId: string) {
-    return true; // TODO: Implement livestreams
+  async getConferenceRoomStatus(id: string): Promise<ConferenceRoomActiveDto> {
+    const room = await this.conferenceRepository.findOne({ where: { roomSid: id } });
+    if (!room) throw new NotFoundException(`Konference ${id} nav atrasta!`);
+    const livestreams = [];
+    if (room.epiphanId) {
+      livestreams.push(<ConferenceRoomLivestreamDto>{
+        id: room.epiphanId,
+        isStreaming: room.isActive,
+      });
+    }
+    return <ConferenceRoomActiveDto>{
+      id: room.roomSid,
+      isActive: room.isActive,
+      livestreams: livestreams,
+    };
   }
 
-  async stopLivestream(roomId: string, epiphanId: string) {
-    return true; // TODO: Implement livestreams
+  async startLivestream(roomSid: string, epiphanId: string) {
+    const room = await this.conferenceRepository.findOne({ where: { roomSid: roomSid } });
+    if (!room) throw new NotFoundException(`Konference ${roomSid} nav atrasta!`);
+    if (!await firstValueFrom(this.client.send<boolean>(START_EPIPHAN_LIVESTREAM, <StartEpiphanLivestreamDto>{
+      roomMetadata: room.metadata,
+      epiphanId: epiphanId
+    }))) {
+      room.epiphanId = epiphanId;
+      await this.conferenceRepository.save(room);
+      return;
+    }
+    throw InternalServerErrorException
+  }
+
+  async stopLivestream(roomSid: string, epiphanId: string) {
+    const room = await this.conferenceRepository.findOne({ where: { roomSid: roomSid } });
+    if (!room) throw new NotFoundException(`Konference ${roomSid} nav atrasta!`);
+    if (!await firstValueFrom(this.client.send<boolean>(STOP_EPIPHAN_LIVESTREAM, <StopEpiphanLivestreamDto>{
+      roomMetadata: room.metadata,
+      epiphanId: epiphanId
+    }))) {
+      room.epiphanId = epiphanId;
+      await this.conferenceRepository.save(room);
+      return;
+    }
+    throw InternalServerErrorException
   }
 
   async getConferenceSession(roomSid: string): Promise<ConferenceSession> {
     return await this.conferenceRepository.findOne({ where: { roomSid: roomSid } });
   }
-  async createConferenceRoom(payload: CreateConferenceRoom): Promise<CreateRoomResponse> {
+  async createConferenceRoom(payload: CreateConferenceRoomDto): Promise<CreateRoomResponse> {
     const response = await this.PNMController.createRoom({
       room_id: payload.roomId,
       metadata: payload.metadata,
