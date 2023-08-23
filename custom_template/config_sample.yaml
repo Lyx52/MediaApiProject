@@ -1,0 +1,4 @@
+media_api:
+  host: LBTU_MEDIA_API_HOST
+  key: LBTU_MEDIA_API_KEY
+  secret: LBTU_MEDIA_API_SECRET

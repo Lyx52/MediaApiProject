@@ -5,6 +5,8 @@ import { PlugNMeetToRecorderDeserializer } from "./common/deserializers/PlugNMee
 import { RedisOptions } from "@nestjs/microservices/interfaces/microservice-configuration.interface";
 import config from './common/utils/config.yaml';
 import {HmacAuthGuard} from "./common/middleware/hmac.authguard";
+import { isJWT } from "class-validator";
+import jwtDecode from "jwt-decode";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.connectMicroservice<MicroserviceOptions>({

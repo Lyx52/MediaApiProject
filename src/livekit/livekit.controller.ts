@@ -4,7 +4,7 @@ import {
   LIVEKIT_SERVICE, LIVEKIT_WEBHOOK_EVENT,
   PLUGNMEET_ROOM_ENDED,
   START_LIVEKIT_EGRESS_RECORDING,
-  STOP_LIVEKIT_EGRESS_RECORDING
+  STOP_LIVEKIT_EGRESS_RECORDING, VERIFY_LIVEKIT_TOKEN
 } from "../app.constants";
 import { ClientProxy, Ctx, EventPattern, MessagePattern, Payload, RedisContext } from "@nestjs/microservices";
 import { StopEgressRecordingDto } from "./dto/StopEgressRecordingDto";
@@ -17,10 +17,16 @@ import {ConfigService} from "@nestjs/config";
 import { IngressInfo, WebhookReceiver } from "livekit-server-sdk";
 import { WebhookEvent } from "livekit-server-sdk/dist/proto/livekit_webhook";
 import {Public} from "../common/utils/decorators/public.decorator";
+import { VerifyLivekitTokenDto } from "../plugnmeet/dto/VerifyLivekitTokenDto";
+import * as livekitClient from "livekit-client";
+import jwt_decode from "jwt-decode";
+import { isJWT } from "class-validator";
+import jwtDecode from "jwt-decode";
 @Controller('livekit')
 export class LivekitController {
   private readonly logger: Logger = new Logger(LivekitController.name);
   private readonly webhookHandler: WebhookReceiver;
+  private readonly livekitHost: string;
   constructor(
     private readonly egressService: LivekitEgressService,
     private readonly ingressService: LivekitIngressService,
@@ -31,6 +37,7 @@ export class LivekitController {
         this.config.getOrThrow<string>("livekit.key"),
         this.config.getOrThrow<string>("livekit.secret"),
     );
+    this.livekitHost = this.config.getOrThrow<string>("livekit.host");
   }
   @EventPattern(LIVEKIT_WEBHOOK_EVENT)
   async handleLivekitWebhookEvents(@Body() data: WebhookEvent) {
@@ -80,7 +87,18 @@ export class LivekitController {
       data: ingressSession
     }
   }
-
+  @MessagePattern(VERIFY_LIVEKIT_TOKEN)
+  async verifyLivekitToken(@Body() token: string): Promise<VerifyLivekitTokenDto>  {
+    const connectionCheck = new livekitClient.ConnectionCheck(this.livekitHost, token);
+    if (connectionCheck.isSuccess() && isJWT(token)) {
+      const jwt: any = jwtDecode(token)
+      return <VerifyLivekitTokenDto> {
+        succcess: jwt?.video?.room !== undefined,
+        roomId: jwt?.video?.room
+      }
+    }
+    return <VerifyLivekitTokenDto>{ succcess: false }
+  }
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {
     this.logger.debug("LIVEKIT:PLUGNMEET_ROOM_ENDED");

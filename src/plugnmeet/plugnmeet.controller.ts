@@ -1,8 +1,19 @@
-import { Body, Controller, Get, Header, HttpCode, Inject, Logger, Param, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Inject,
+  Logger,
+  Param,
+  Post,
+  UnauthorizedException
+} from "@nestjs/common";
 import {
   GET_CONFERENCE_SESSION,
   LIVEKIT_WEBHOOK_EVENT, PING_EPIPHAN_DEVICE,
-  PLUGNMEET_SERVICE
+  PLUGNMEET_SERVICE, VERIFY_LIVEKIT_TOKEN
 } from "../app.constants";
 import {ClientProxy, Ctx, EventPattern, MessagePattern, Payload} from "@nestjs/microservices";
 import { PlugNMeetService } from "./services/plugnmeet.service";
@@ -14,6 +25,8 @@ import { PlugNMeetToRecorder, RecordingTasks } from "src/proto/plugnmeet_recorde
 import { PingEpiphanDto } from "../epiphan/dto/PingEpiphanDto";
 import { ConferenceSession } from "./entities/ConferenceSession";
 import { GetConferenceSessionDto } from "./dto/GetConferenceSessionDto";
+import { firstValueFrom } from "rxjs";
+import { VerifyLivekitTokenDto } from "./dto/VerifyLivekitTokenDto";
 
 @Controller('conference')
 export class PlugNMeetController {
@@ -69,6 +82,14 @@ export class PlugNMeetController {
     return await this.pnmService.stopLivestream(roomId, epiphanId);
   }
 
+  @Post('getAccessToken/:livekitToken')
+  async getAccessTokenRecorder(@Param(':livekitToken') livekitToken: string) {
+    const res = await firstValueFrom(this.client.send<VerifyLivekitTokenDto>(VERIFY_LIVEKIT_TOKEN, livekitToken));
+    if (res.succcess) {
+      return this.pnmService.generateToken(res.roomId)
+    }
+    throw new UnauthorizedException("Livekit token not valid!");
+  }
   @MessagePattern(GET_CONFERENCE_SESSION)
   async getConferenceInfo(@Payload() payload: GetConferenceSessionDto): Promise<ConferenceSession> {
     return await this.pnmService.getConferenceSession(payload.roomSid);

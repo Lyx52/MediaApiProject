@@ -7,11 +7,12 @@ import {
   useTracks,
 } from '@livekit/components-react';
 import EgressHelper from '@livekit/egress-sdk';
-import { ConnectionState, RoomEvent, Track } from 'livekit-client';
+import { ConnectionCheck, ConnectionState, Room, RoomEvent, Track } from "livekit-client";
 import { ReactElement, useEffect, useState } from 'react';
 import SingleSpeakerLayout from './SingleSpeakerLayout';
 import SpeakerLayout from './SpeakerLayout';
-
+import { RoomServiceClient } from "livekit-server-sdk";
+import axios from 'axios';
 interface RoomPageProps {
   url: string;
   token: string;
@@ -23,12 +24,14 @@ export default function RoomPage({ url, token, layout }: RoomPageProps) {
   if (!url || !token) {
     return <div className="error">missing required params url and token</div>;
   }
+  const check = new ConnectionCheck(url, token);
+  if (!check.isSuccess()) {
+    return <div className="error">cannot connect to server</div>;
+  }
+  const roomTokenGenerate = axios.post("", {
 
-  return (
-    <LiveKitRoom serverUrl={url} token={token} onError={setError}>
-      {error ? <div className="error">{error.message}</div> : <CompositeTemplate layout={layout} />}
-    </LiveKitRoom>
-  );
+  })
+  return (<h1>test</h1>);
 }
 
 interface CompositeTemplateProps {

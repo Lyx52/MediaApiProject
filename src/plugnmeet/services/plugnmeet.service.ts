@@ -8,7 +8,14 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MongoRepository } from "typeorm";
-import {ActiveRoomInfo, CreateRoomResponse, CreateRoomResponseRoomInfo, PlugNmeet, Room} from "plugnmeet-sdk-js";
+import {
+  ActiveRoomInfo,
+  CreateRoomResponse,
+  CreateRoomResponseRoomInfo,
+  JoinTokenParams, JoinTokenResponse,
+  PlugNmeet,
+  Room
+} from "plugnmeet-sdk-js";
 import { InjectRedis } from "@liaoliaots/nestjs-redis";
 import Redis from "ioredis";
 import {
@@ -18,7 +25,7 @@ import {
   START_EPIPHAN_RECORDING,
   START_LIVEKIT_EGRESS_RECORDING, START_OPENCAST_EVENT, STOP_EPIPHAN_LIVESTREAM,
   STOP_EPIPHAN_RECORDING,
-  STOP_LIVEKIT_EGRESS_RECORDING
+  STOP_LIVEKIT_EGRESS_RECORDING, VERIFY_LIVEKIT_TOKEN
 } from "../../app.constants";
 import { Recorder } from "../entities/Recorder";
 import { PlugNMeetTaskService } from "./plugnmeet.task.service";
@@ -46,6 +53,7 @@ import { ConferenceRoomActiveDto } from "../dto/ConferenceRoomActiveDto";
 import { ConferenceRoomLivestreamDto } from "../dto/ConferenceRoomLivestreamDto";
 import { StartEpiphanLivestreamDto } from "../../epiphan/dto/StartEpiphanLivestreamDto";
 import { StopEpiphanLivestreamDto } from "../../epiphan/dto/StopEpiphanLivestreamDto";
+import { VerifyLivekitTokenDto } from "../dto/VerifyLivekitTokenDto";
 
 @Injectable()
 export class PlugNMeetService implements OnModuleInit {
@@ -150,7 +158,16 @@ export class PlugNMeetService implements OnModuleInit {
     }
     throw InternalServerErrorException
   }
-
+  async generateToken(roomId: string): Promise<JoinTokenResponse> {
+    return await this.PNMController.getJoinToken(<JoinTokenParams>{
+      room_id: roomId,
+      user_info: {
+        user_id: "RECORDING_BOT",
+        name: "RECORDING_BOT",
+        is_hidden: true
+      }
+    });
+  }
   async getConferenceSession(roomSid: string): Promise<ConferenceSession> {
     return await this.conferenceRepository.findOne({ where: { roomSid: roomSid } });
   }

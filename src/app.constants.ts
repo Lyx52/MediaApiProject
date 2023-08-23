@@ -22,6 +22,7 @@ export const STOP_OPENCAST_EVENT = { cmd: "startOpencastIngest" }
 export const ADD_OPENCAST_INGEST_JOB = { cmd: "addOpencastIngestJob" }
 export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
 export const CREATE_OR_GET_INGRESS_STREAM_KEY = { cmd: 'createOrGetIngressStreamKey' }
+export const VERIFY_LIVEKIT_TOKEN = { cmd: "verifyLivekitToken" }
 export const GET_CONFERENCE_SESSION = { cmd: 'getConferenceSession' }
 export const LIVEKIT_WEBHOOK_EVENT = { cmd: 'livekitWebhookEvent' }
 export const START_INGESTING_VIDEOS = { cmd: 'startIngestingVideos' }

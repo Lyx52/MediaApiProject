@@ -2,7 +2,7 @@ import '@livekit/components-styles';
 import '@livekit/components-styles/prefabs';
 import EgressHelper from '@livekit/egress-sdk';
 import './App.css';
-import RoomPage from './Room';
+import RoomPage from "./Room";
 
 function App() {
   return (
