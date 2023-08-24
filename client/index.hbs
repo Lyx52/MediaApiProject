@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <style>
+        .fullSize {
+            position:fixed;
+            top:0;
+            left:0;
+            bottom:0;
+            right:0;
+            width:100%;
+            height:100%;
+            border:none;
+            margin:0;
+            padding:0;
+            overflow:hidden;
+            z-index:999999;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <script type="module" src="/index.js"></script>
+</head>
+<body>
+    <iframe onload="window.EgressHelper.onPageLoad('{{ livekitURL }}', '{{ livekitToken }}')" src="https://plugnmeet.lbtu.lv/?access_token={{ accessToken }}&autoconnect=1" class="fullSize"></iframe>
+</body>
+</html>

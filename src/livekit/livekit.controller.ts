@@ -1,10 +1,22 @@
-import {Body, Controller, Inject, Headers, Logger, Post, Req, Request, RawBodyRequest, Header} from "@nestjs/common";
 import {
-  CREATE_OR_GET_INGRESS_STREAM_KEY, GET_EVENT_STATUS,
+  Body,
+  Controller,
+  Inject,
+  Headers,
+  Logger,
+  Post,
+  Req,
+  Request,
+  RawBodyRequest,
+  Header,
+  Render, Get, Query, UnauthorizedException
+} from "@nestjs/common";
+import {
+  CREATE_OR_GET_INGRESS_STREAM_KEY, GET_EVENT_STATUS, GET_PLUGNMEET_ACCESS_TOKEN,
   LIVEKIT_SERVICE, LIVEKIT_WEBHOOK_EVENT,
   PLUGNMEET_ROOM_ENDED,
   START_LIVEKIT_EGRESS_RECORDING,
-  STOP_LIVEKIT_EGRESS_RECORDING, VERIFY_LIVEKIT_TOKEN
+  STOP_LIVEKIT_EGRESS_RECORDING, STOP_OPENCAST_EVENT, VERIFY_LIVEKIT_TOKEN
 } from "../app.constants";
 import { ClientProxy, Ctx, EventPattern, MessagePattern, Payload, RedisContext } from "@nestjs/microservices";
 import { StopEgressRecordingDto } from "./dto/StopEgressRecordingDto";
@@ -22,6 +34,10 @@ import * as livekitClient from "livekit-client";
 import jwt_decode from "jwt-decode";
 import { isJWT } from "class-validator";
 import jwtDecode from "jwt-decode";
+import {firstValueFrom} from "rxjs";
+import {StopOpencastEventDto} from "../opencast/dto/StopOpencastEventDto";
+import {OpencastIngestType} from "../opencast/dto/enums/OpencastIngestType";
+import {GetAccessTokenDto} from "../plugnmeet/dto/GetAccessTokenDto";
 @Controller('livekit')
 export class LivekitController {
   private readonly logger: Logger = new Logger(LivekitController.name);
@@ -70,6 +86,21 @@ export class LivekitController {
       this.logger.warn(`Failed to handle webhook event from livekit!\n${e}`);
     }
   }
+  @Public()
+  @Get("layout")
+  @Render('index')
+  async renderLayout(@Query("token") token: string, @Query("url") url: string) {
+    const connectionCheck = new livekitClient.ConnectionCheck(this.livekitHost, token);
+    if (connectionCheck.isSuccess() && isJWT(token)) {
+      const jwt: any = jwtDecode(token)
+      const accessTokenRes: any = await firstValueFrom(this.client.send(GET_PLUGNMEET_ACCESS_TOKEN, <GetAccessTokenDto> {
+        roomId: jwt?.video?.room
+      }));
+
+      return { accessToken: accessTokenRes?.token, livekitURL: url, livekitToken: token };
+    }
+    throw new UnauthorizedException('Invalid livekit token!');
+  }
 
   @MessagePattern(START_LIVEKIT_EGRESS_RECORDING)
   async startEgressRecording(@Body() data: StartEgressRecordingDto): Promise<boolean> {
@@ -87,18 +118,7 @@ export class LivekitController {
       data: ingressSession
     }
   }
-  @MessagePattern(VERIFY_LIVEKIT_TOKEN)
-  async verifyLivekitToken(@Body() token: string): Promise<VerifyLivekitTokenDto>  {
-    const connectionCheck = new livekitClient.ConnectionCheck(this.livekitHost, token);
-    if (connectionCheck.isSuccess() && isJWT(token)) {
-      const jwt: any = jwtDecode(token)
-      return <VerifyLivekitTokenDto> {
-        succcess: jwt?.video?.room !== undefined,
-        roomId: jwt?.video?.room
-      }
-    }
-    return <VerifyLivekitTokenDto>{ succcess: false }
-  }
+
   @EventPattern(PLUGNMEET_ROOM_ENDED)
   async roomEndedHandle(@Body() data: PlugNMeetRoomEndedDto) {
     this.logger.debug("LIVEKIT:PLUGNMEET_ROOM_ENDED");

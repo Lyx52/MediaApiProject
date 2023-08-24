@@ -11,15 +11,12 @@ import {
   STOP_LIVEKIT_EGRESS_RECORDING
 } from "src/app.constants";
 import { PlugNMeetRecorderInfoDto } from "../dto/PlugNMeetRecorderInfoDto";
-import { CronJob } from "cron";
 import { PlugNmeet } from "plugnmeet-sdk-js";
 import { ConfigService } from "@nestjs/config";
 import { Recorder } from "../entities/Recorder";
 import { ConferenceSession } from "../entities/ConferenceSession";
 import { ClientProxy } from "@nestjs/microservices";
 import { PlugNMeetRoomEndedDto } from "../dto/PlugNMeetRoomEndedDto";
-import { util } from "protobufjs";
-import compareFieldsById = util.compareFieldsById;
 import { StopEgressRecordingDto } from "../../livekit/dto/StopEgressRecordingDto";
 import { StopEpiphanRecordingDto } from "../../epiphan/dto/StopEpiphanRecordingDto";
 

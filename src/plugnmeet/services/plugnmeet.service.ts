@@ -164,7 +164,8 @@ export class PlugNMeetService implements OnModuleInit {
       user_info: {
         user_id: "RECORDING_BOT",
         name: "RECORDING_BOT",
-        is_hidden: true
+        is_hidden: true,
+        is_admin: true
       }
     });
   }

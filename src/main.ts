@@ -5,10 +5,14 @@ import { PlugNMeetToRecorderDeserializer } from "./common/deserializers/PlugNMee
 import { RedisOptions } from "@nestjs/microservices/interfaces/microservice-configuration.interface";
 import config from './common/utils/config.yaml';
 import {HmacAuthGuard} from "./common/middleware/hmac.authguard";
-import { isJWT } from "class-validator";
-import jwtDecode from "jwt-decode";
+import {NestExpressApplication} from "@nestjs/platform-express";
+import { join } from 'path';
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useStaticAssets(join(__dirname, '..', 'public'));
+  app.setBaseViewsDir(join(__dirname, '..', 'client'));
+  app.setViewEngine('hbs');
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.TCP,
     options: { retryAttempts: 3, retryDelay: 1000 },

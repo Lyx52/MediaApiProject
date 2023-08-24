@@ -5,6 +5,7 @@ appconfig:
   recording_location: './recording_files'
   key: MEDIA_API_KEY
   secret: MEDIA_API_SECRET
+  host: MEDIA_API_HOST
 plugnmeet:
   host: PLUG_N_MEET_SERVER_DOMAIN
   key: PLUG_N_MEET_API_KEY

@@ -29,6 +29,7 @@ export class LivekitEgressService {
   private readonly egressClient: EgressClient;
   private readonly PNMController: PlugNmeet;
   private readonly recordingLocation: string;
+  private readonly mediaApiHost: string;
   constructor(
     @Inject(LIVEKIT_EGRESS_SERVICE) private readonly client: ClientProxy,
     @InjectRedis() private readonly redisClient: Redis,
@@ -44,7 +45,8 @@ export class LivekitEgressService {
       config.getOrThrow<string>('plugnmeet.key'),
       config.getOrThrow<string>('plugnmeet.secret'),
     );
-    this.recordingLocation = this.config.getOrThrow<string>("appconfig.recording_location");
+    this.mediaApiHost = this.config.getOrThrow<string>('appconfig.host')
+    this.recordingLocation = this.config.getOrThrow<string>('appconfig.recording_location');
   }
 
   async ingestEgress(session: EgressInfo, roomSid: string, recorderId: string) {
@@ -139,6 +141,7 @@ export class LivekitEgressService {
         {
           encodingOptions: EncodingOptionsPreset.H264_1080P_60,
           layout: 'grid-dark',
+          customBaseUrl: `${this.mediaApiHost}livekit/layout`
         },
       );
       if (result.error || !result.egressId) {

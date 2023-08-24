@@ -24,16 +24,15 @@ export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
 export const CREATE_OR_GET_INGRESS_STREAM_KEY = { cmd: 'createOrGetIngressStreamKey' }
 export const VERIFY_LIVEKIT_TOKEN = { cmd: "verifyLivekitToken" }
 export const GET_CONFERENCE_SESSION = { cmd: 'getConferenceSession' }
+export const GET_PLUGNMEET_ACCESS_TOKEN = { cmd: 'getPnmAccessToken' }
 export const LIVEKIT_WEBHOOK_EVENT = { cmd: 'livekitWebhookEvent' }
 export const START_INGESTING_VIDEOS = { cmd: 'startIngestingVideos' }
 export const GET_EVENT_STATUS = { cmd: 'getEventStatus' }
 
 // Job patterns
-export const INGEST_VIDEO_JOB = 'INGEST_VIDEO_JOB';
 export const INGEST_MEDIAPACKAGE_JOB = 'INGEST_MEDIAPACKAGE_JOB';
 export const DOWNLOAD_VIDEO_JOB = 'DOWNLOAD_VIDEO_JOB';
 
 // Other constants
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';
 export const CONFERENCE_MIN_AWAIT = 15_000; // 15 Sec wait for everything to properly shutdown before able to start again.
-export const MAX_INGEST_RETRY_COUNT = 50;

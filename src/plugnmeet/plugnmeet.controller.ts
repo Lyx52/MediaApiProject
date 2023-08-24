@@ -7,11 +7,11 @@ import {
   Inject,
   Logger,
   Param,
-  Post,
+  Post, Query, Render,
   UnauthorizedException
 } from "@nestjs/common";
 import {
-  GET_CONFERENCE_SESSION,
+  GET_CONFERENCE_SESSION, GET_PLUGNMEET_ACCESS_TOKEN,
   LIVEKIT_WEBHOOK_EVENT, PING_EPIPHAN_DEVICE,
   PLUGNMEET_SERVICE, VERIFY_LIVEKIT_TOKEN
 } from "../app.constants";
@@ -27,6 +27,8 @@ import { ConferenceSession } from "./entities/ConferenceSession";
 import { GetConferenceSessionDto } from "./dto/GetConferenceSessionDto";
 import { firstValueFrom } from "rxjs";
 import { VerifyLivekitTokenDto } from "./dto/VerifyLivekitTokenDto";
+import {GetAccessTokenDto} from "./dto/GetAccessTokenDto";
+import {Public} from "../common/utils/decorators/public.decorator";
 
 @Controller('conference')
 export class PlugNMeetController {
@@ -41,20 +43,6 @@ export class PlugNMeetController {
   @HttpCode(200)
   @Header('Cache-Control', 'none')
   async createConferenceRoom(@Body() payload: CreateConferenceRoomDto): Promise<CreateRoomResponse> {
-    if (payload.epiphanDevices && payload.epiphanDevices.length > 0) {
-      // Promise await all then check if all result in success
-      const pingResults = await this.pnmService.pingAllEpiphanDevices(payload.epiphanDevices);
-      const inactiveDevices = pingResults.filter(d => !d.active);
-      if (inactiveDevices.length > 0) {
-        this.logger.error(`Some epiphan devices are not reachable [${inactiveDevices.map(d => d.epiphanId).join(",")}]!`)
-        return <CreateRoomResponse>{
-          status: false,
-          msg: "Some epiphan devices are not reachable!",
-          devices: inactiveDevices.map(d => d.epiphanId)
-        };
-      }
-    }
-
     return await this.pnmService.createConferenceRoom(payload);
   }
   @Get('rooms')
@@ -82,13 +70,9 @@ export class PlugNMeetController {
     return await this.pnmService.stopLivestream(roomId, epiphanId);
   }
 
-  @Post('getAccessToken/:livekitToken')
-  async getAccessTokenRecorder(@Param(':livekitToken') livekitToken: string) {
-    const res = await firstValueFrom(this.client.send<VerifyLivekitTokenDto>(VERIFY_LIVEKIT_TOKEN, livekitToken));
-    if (res.succcess) {
-      return this.pnmService.generateToken(res.roomId)
-    }
-    throw new UnauthorizedException("Livekit token not valid!");
+  @MessagePattern(GET_PLUGNMEET_ACCESS_TOKEN)
+  async getAccessToken(@Payload() payload: GetAccessTokenDto) {
+    return this.pnmService.generateToken(payload.roomId)
   }
   @MessagePattern(GET_CONFERENCE_SESSION)
   async getConferenceInfo(@Payload() payload: GetConferenceSessionDto): Promise<ConferenceSession> {

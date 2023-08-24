@@ -16,6 +16,7 @@ export class HmacAuthGuard implements CanActivate {
 
         const request = context.switchToHttp().getRequest();
         return this.authenticate(request);
+
     }
     authenticate(req: Request): boolean {
         const providedSignature = req.headers['x-signature'];
