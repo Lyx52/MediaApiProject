@@ -10,9 +10,10 @@ import config from "../common/utils/config.yaml";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { OpencastEvent } from "./entities/opencast.event";
 import { OpencastVideoIngestConsumer } from "./processors/opencast.ingest.processor";
+import { OpencastTaskService } from "./services/opencast.task.service";
+import { ScheduleModule } from "@nestjs/schedule";
 @Module({
   imports: [
-    ClientsModule.register([{ name: OPENCAST_SERVICE, transport: Transport.TCP }]),
     BullModule.registerQueue({
       name: 'video',
       defaultJobOptions: {
@@ -27,7 +28,7 @@ import { OpencastVideoIngestConsumer } from "./processors/opencast.ingest.proces
     }),
     ConfigModule.forRoot({ load: [config] }),
   ],
-  providers: [OpencastVideoIngestConsumer, OpencastService],
+  providers: [OpencastVideoIngestConsumer, OpencastService, OpencastTaskService],
   controllers: [OpencastController],
 })
 export class OpencastModule {}

@@ -3,6 +3,7 @@ appconfig:
   max_recorders: 2
   port: 9999
   recording_location: './recording_files'
+  archive_location: './archived'
   key: MEDIA_API_KEY
   secret: MEDIA_API_SECRET
   host: MEDIA_API_HOST
@@ -16,11 +17,6 @@ redis:
   username: ""
   password: ""
   db: 0
-livekit:
-  host: LIVEKIT_SERVER_DOMAIN
-  key: LIVEKIT_API_KEY
-  secret: LIVEKIT_SECRET
-  rtmp_url: LIVEKIT_PUBLIC_RTMP_URL
 opencast:
   host: OPENCAST_HOSTNAME
   username: OPENCAST_USERNAME
@@ -29,25 +25,3 @@ mongodb:
   host: MONGODB_HOST
   database: MONGODB_DATABASE
   port: MONGODB_PORT
-epiphan_config:
-  - name: DEVICE_NAME_0
-    identifier: DEVICE_IDENTIFIER_0
-    host: DEVICE_HOSTNAME
-    username: DEVICE_USERNAME
-    password: DEVICE_PASSWORD
-    default_channel: DEFAULT_LAYOUT
-    default_publisher: DEFAULT_RTMP_PUBLISHER
-  - name: DEVICE_NAME_1
-    identifier: DEVICE_IDENTIFIER_1
-    host: DEVICE_HOSTNAME
-    username: DEVICE_USERNAME
-    password: DEVICE_PASSWORD
-    default_channel: DEFAULT_LAYOUT
-    default_publisher: DEFAULT_RTMP_PUBLISHER
-  - name: DEVICE_NAME_n
-    identifier: DEVICE_IDENTIFIER_n
-    host: DEVICE_HOSTNAME
-    username: DEVICE_USERNAME
-    password: DEVICE_PASSWORD
-    default_channel: DEFAULT_LAYOUT
-    default_publisher: DEFAULT_RTMP_PUBLISHER

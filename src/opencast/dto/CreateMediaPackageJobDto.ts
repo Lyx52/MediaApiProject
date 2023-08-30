@@ -1,5 +1,4 @@
 import { IsEnum, IsNotEmpty, IsString } from "class-validator";
-import { MediaType } from "../../livekit/dto/enums/MediaType";
 
 export class CreateMediaPackageJobDto {
   @IsString()

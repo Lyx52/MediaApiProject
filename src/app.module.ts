@@ -1,14 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { EpiphanModule } from "./epiphan/epiphan.module";
-import { PlugNMeetModule } from "./plugnmeet/plugnmeet.module";
-import { LivekitModule } from "./livekit/livekit.module";
-import { Recorder } from "./plugnmeet/entities/Recorder";
 import { OpencastModule } from "./opencast/opencast.module";
 import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/opencast.event";
-import { ConferenceSession } from "./plugnmeet/entities/ConferenceSession";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -18,12 +14,13 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
         host: config.getOrThrow<string>('mongodb.host'),
         database: config.getOrThrow<string>('mongodb.database'),
         port: config.getOrThrow<number>('mongodb.port'),
-        entities: [Recorder, OpencastEvent, ConferenceSession],
+        entities: [OpencastEvent],
         synchronize: true,
         useUnifiedTopology: true
       }),
       inject: [ConfigService],
     }),
+    ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
@@ -37,7 +34,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
       }),
       inject: [ConfigService],
     }),
-    EpiphanModule, PlugNMeetModule, LivekitModule, OpencastModule
+    OpencastModule
   ],
 })
 export class AppModule {}
