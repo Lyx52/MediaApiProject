@@ -2,8 +2,8 @@ appconfig:
   max_retries: 5
   max_recorders: 2
   port: 9999
-  recording_location: './recording_files'
-  archive_location: './archived'
+  pnm_recording_location: './recordings'
+  epiphan_recording_location: './recordings_epiphan'
   key: MEDIA_API_KEY
   secret: MEDIA_API_SECRET
   host: MEDIA_API_HOST

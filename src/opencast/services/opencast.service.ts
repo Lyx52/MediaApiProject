@@ -1,22 +1,17 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
-import { StartOpencastEventDto } from "../dto/StartOpencastEventDto";
 import { ConfigService } from "@nestjs/config";
 import { firstValueFrom, map } from "rxjs";
 import { handleAxiosExceptions, retryPolicy } from "../../common/utils/axios.utils";
 import { CaptureAgentState } from "../dto/enums/CaptureAgentState";
 import { OpencastRecordingState } from "../dto/enums/OpencastRecordingState";
-import { InjectRepository } from "@nestjs/typeorm";
-import { MongoRepository } from "typeorm";
-import { ObjectID } from "mongodb";
-import { OpencastEvent } from "../entities/opencast.event";
-import { StopOpencastEventDto } from "../dto/StopOpencastEventDto";
-import { IngestJobDto } from "../dto/IngestJobDto";
-import * as fs from 'fs/promises';
+import { OpencastEvent } from "../entities/OpencastEvent";
+
 import { basename } from "path";
-import { toTitle } from "../dto/enums/OpencastIngestType";
 import {InjectQueue} from "@nestjs/bull";
-import {Queue} from "bull";
+import {Queue} from "bull";;
+import {getRecorderId, getSeriesName, RecorderType} from "../dto/enums/RecorderType";
+import * as fs from "fs/promises";
 @Injectable()
 export class OpencastService implements OnModuleInit {
   private readonly logger: Logger = new Logger(OpencastService.name);
@@ -27,7 +22,6 @@ export class OpencastService implements OnModuleInit {
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
     @InjectQueue('video') private ingestQueue: Queue,
-    @InjectRepository(OpencastEvent) private readonly eventRepository: MongoRepository<OpencastEvent>,
   ) {
     this.host = this.config.getOrThrow<string>("opencast.host");
     this.password = this.config.getOrThrow<string>("opencast.password");
@@ -77,24 +71,16 @@ export class OpencastService implements OnModuleInit {
     ));
   }
 
-  async findEventById(id: string) {
-    return this.findEvent({ id: ObjectID(id) });
-  }
-  async findEvent(whereStr: object): Promise<OpencastEvent> {
-    return this.eventRepository.findOne({
-      where: whereStr,
-      select: ['id', 'title', "agentState", "recorderId", "recordingState", "agentState", "roomSid", "eventId"],
-    });
-  }
-  async createMediaPackage() {
+  async createMediaPackage(): Promise<string> {
     const headers = this.makeAuthHeader();
-    return firstValueFrom(this.httpService.get(`${this.host}/ingest/createMediaPackage`, {
+    const mediaPackage = await firstValueFrom(this.httpService.get(`${this.host}/ingest/createMediaPackage`, {
       headers: headers
     }).pipe(
       map((response) => response.data.toString()),
       retryPolicy(),
       handleAxiosExceptions(),
     ));
+    return <string>mediaPackage;
   }
   async getMediaPackageByEventId(eventId: string) {
     const headers = this.makeAuthHeader();
@@ -106,15 +92,16 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   }
-  async createMediaPackageWithId(mediaPackageId: string) {
+  async createMediaPackageWithId(mediaPackageId: string): Promise<string> {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
-    return firstValueFrom(this.httpService.put(`${this.host}/ingest/createMediaPackageWithID/${mediaPackageId}`, {}, {
+    const mediaPackage = await firstValueFrom(this.httpService.put(`${this.host}/ingest/createMediaPackageWithID/${mediaPackageId}`, {}, {
       headers: headers
     }).pipe(
       map((response) => response.data.toString()),
       retryPolicy(),
       handleAxiosExceptions(),
     ));
+    return <string>mediaPackage;
   }
   async setEventSeries(eventId: string, seriesId: string) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
@@ -173,7 +160,7 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   }
-  async createSeries(seriesName, roomName, lang = "lv", aclName = "public", seriesContributor = "PlugNMeet", seriesCreator = "LBTUMediaAPI")
+  async createSeries(seriesName, recorderName, lang = "lv", aclName = "public", seriesContributor = "PlugNMeet", seriesCreator = "LBTUMediaAPI")
   {
     const metadata = [
       {
@@ -203,7 +190,7 @@ export class OpencastService implements OnModuleInit {
             'id': 'description',
             'label': 'EVENTS.SERIES.DETAILS.METADATA.DESCRIPTION',
             'type': 'text',
-            'value': `PlugNMeet conference for ${roomName}`,
+            'value': `Series for ${recorderName} recorder`,
             'required': false
           },
           {
@@ -355,7 +342,7 @@ export class OpencastService implements OnModuleInit {
         license: "ALLRIGHTS"
       })
   }
-  async addDublinCore(event: OpencastEvent, mediaPackage: string) {
+  async addDublinCore(event: OpencastEvent, mediaPackage: string): Promise<string> {
     const params = new URLSearchParams();
     params.set('mediaPackage', mediaPackage);
     const dublinCore = this.generateEventDublinCore(event);
@@ -363,7 +350,7 @@ export class OpencastService implements OnModuleInit {
     params.set('flavor', 'dublincore/episode');
 
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded; charset=utf-8',);
-    return firstValueFrom(this.httpService.post(`${this.host}/ingest/addDCCatalog`, {}, {
+    const newMediaPackage = await firstValueFrom(this.httpService.post(`${this.host}/ingest/addDCCatalog`, {}, {
       headers: headers,
       params: params
     }).pipe(
@@ -371,16 +358,16 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-
+    return <string>newMediaPackage;
   }
   async setCaptureAgentState(
-    event: OpencastEvent,
+    recorder: RecorderType,
     state = CaptureAgentState.IDLE,
   ) {
     const params = new URLSearchParams();
     params.set('state', state);
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
-    await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${event.recorderId}`, {},{
+    await firstValueFrom(this.httpService.post(`${this.host}/capture-admin/agents/${recorder}`, {},{
       headers: headers,
       params: params
     }).pipe(
@@ -388,14 +375,13 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    event.agentState = state;
-    return event;
   };
-  async setRecordingEventState(event: OpencastEvent, state: OpencastRecordingState) {
+
+  async setRecordingEventState(eventId: string, state: OpencastRecordingState) {
     const params = new URLSearchParams();
     params.set('state', state);
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
-    await firstValueFrom(this.httpService.put(`${this.host}/recordings/${event.eventId}/recordingStatus`, {},{
+    await firstValueFrom(this.httpService.put(`${this.host}/recordings/${eventId}/recordingStatus`, {},{
       headers: headers,
       params: params
     }).pipe(
@@ -403,14 +389,13 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    event.recordingState = state;
-    return event;
   };
+
   async createRecordingEvent(event: OpencastEvent, mediaPackage: string) {
     const params = new URLSearchParams();
     params.set('start', event.start.getTime().toString());
     params.set('end', event.end.getTime().toString());
-    params.set('agent', event.recorderId);
+    params.set('agent', event.recorder);
     params.set('mediaPackage', mediaPackage);
     params.set('users', 'admin');
     params.set('source', event.title);
@@ -424,10 +409,11 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    const createdEvent: any = await this.getLastRecording(event.recorderId);
+    const createdEvent: any = await this.getLastRecording(event.recorder);
     event.eventId = createdEvent.id;
     return event;
   }
+
   async createRecordingEventUsingSchedule(event: OpencastEvent, mediaPackage: string) {
     const data = new FormData();
     data.set('mediaPackage', mediaPackage);
@@ -440,7 +426,7 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    const createdEvent: any = await this.getLastRecording(event.recorderId);
+    const createdEvent: any = await this.getLastRecording(event.recorder);
     event.eventId = createdEvent.id;
     return event;
   }
@@ -559,27 +545,6 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   };
-  async addIngestJob(job: IngestJobDto) {
-    await this.eventRepository.updateOne(
-      { roomSid: job.roomSid, recorderId: job.recorderId },
-      { $push: { jobs: job } }
-    );
-  }
-  async startRecordingEvent(data: StartOpencastEventDto) {
-    let event = await this.eventRepository.findOne({
-      where: { roomSid: data.roomSid, recorderId: data.recorderId }
-    });
-    /**
-     *  If event does not exist we ignore it, for example if we are starting first time there wont be an event.
-     */
-    if (!event) return;
-    event = await this.setCaptureAgentState(event, CaptureAgentState.CAPTURING);
-    event = await this.setRecordingEventState(event, OpencastRecordingState.CAPTURING);
-    event.end = new Date();
-    event.end.setTime(event.end.getTime() + 60000 * 60);
-    await this.updateEventScheduling(event);
-    await this.eventRepository.save(event);
-  };
 
   public async deleteRecorder(recorderId: string) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
@@ -597,7 +562,7 @@ export class OpencastService implements OnModuleInit {
     const mediaPackage = <string>await this.getMediaPackageByEventId(event.eventId);
     data.set('start', event.start.getTime().toString());
     data.set('end', event.end.getTime().toString());
-    data.set('agent', event.recorderId);
+    data.set('agent', event.recorder);
     data.set('mediaPackage', mediaPackage);
     data.set('users', 'admin');
     data.set('source', event.title);
@@ -614,85 +579,17 @@ export class OpencastService implements OnModuleInit {
       /**
        * Set event state, indicating that ingesting queue can start ingesting videos.
        */
-      event = await this. setRecordingEventState(event, OpencastRecordingState.CAPTURE_FINISHED);
-      event = await this.setCaptureAgentState(event, CaptureAgentState.IDLE);
+      await this. setRecordingEventState(event.eventId, OpencastRecordingState.CAPTURE_FINISHED);
+      await this.setCaptureAgentState(event.recorder, CaptureAgentState.IDLE);
       event.end = new Date();
       await this.updateEventScheduling(event);
-      await this.eventRepository.save(event);
       return true;
     } catch (e) {
       this.logger.error(`Caught exception while stopping event: ${e}!`);
       return false;
     }
   }
-  async stopRecordingEvent(data: StopOpencastEventDto): Promise<boolean> {
-    try {
-      const event = await this.createOrGetEvent(data);
-      return this.stopRecordingEventByEntity(event);
-    } catch (e) {
-      this.logger.error(`Caught exception while creating or getting event: ${e}!`);
-    }
-  }
-  async createOrGetEvent(data: StopOpencastEventDto): Promise<OpencastEvent> {
-    /**
-     *  First we try to see if event exists AND if it already has eventId
-     */
-    let event = await this.eventRepository.findOne({
-      where: {
-        roomSid: data.roomSid,
-        recorderId: data.recorderId,
-        eventId: {
-          $ne: null,
-          $exists: true
-        }
-      }
-    });
-    /**
-     * Update end time to current time and if its starting, then add 60 minutes to it
-     */
-    if (event) {
-      event.end = new Date();
-      await this.updateEventScheduling(event);
-      return await this.eventRepository.save(event);
-    }
-    /**
-     * Create event entity, it must be created everytime, because opencast events cannot be started/stopped
-     */
-    event = this.eventRepository.create();
-    event.recorderId = data.recorderId;
-    event.type = data.type
-    event.roomSid = data.roomSid;
-    event.start = new Date();
-    event.end = new Date();
-    event.jobs = [];
-    event.title = `{toTitle(data.type)} recording (${event.start.toLocaleDateString('lv-LV')})`;
-
-    // 1 minute (Since we start when ending the recording)
-    event.end.setTime(event.end.getTime() + 60000);
-
-    const series: any = await this.createOrGetSeriesByTitle("courseName", `${"title"} ${toTitle(data.type)}`);
-    event.seriesId = series.identifier;
-    /**
-     * Add capture agent if dosnt exist, set it to idle for now
-     */
-    event = await this.setCaptureAgentState(event, CaptureAgentState.IDLE);
-    /**
-     *  Create MediaPackage and add DublinCore metadata to MediaPackage
-     */
-    let mediaPackage = await this.createMediaPackageWithId(`roomSid`);
-    mediaPackage = await this.addDublinCore(event, <string>mediaPackage);
-    /**
-     * Create recording
-     */
-    event = await this.createRecordingEvent(event, <string>mediaPackage);
-    /**
-     *  Configure event
-     */
-    await this.setAccessListTemplate(event, 'public');
-    await this.setWorkflow(event, 'lbtu-wf-upload');
-    return await this.eventRepository.save(event);
-  };
-  private async createOrGetSeriesByTitle(seriesTitle: string, roomName: string) {
+  public async createOrGetSeriesByTitle(seriesTitle: string, recorder: RecorderType) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const series: any = await firstValueFrom(this.httpService.get(`${this.host}/api/series/series.json?seriesTitle=${seriesTitle}`, {
       headers: headers
@@ -702,7 +599,7 @@ export class OpencastService implements OnModuleInit {
         handleAxiosExceptions(),
     ));
     if (series.length > 0) return series[0];
-    return await this.createSeries(seriesTitle, roomName);
+    return await this.createSeries(seriesTitle, getSeriesName(recorder));
   }
 
   private makeAuthHeader(contentType = 'application/json') {

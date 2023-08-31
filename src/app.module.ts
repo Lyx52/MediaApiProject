@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OpencastModule } from "./opencast/opencast.module";
 import { BullModule } from "@nestjs/bull";
-import { OpencastEvent } from "./opencast/entities/opencast.event";
+import { OpencastEvent } from "./opencast/entities/OpencastEvent";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import {Conference} from "./opencast/entities/Conference";
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -14,9 +15,10 @@ import { ScheduleModule } from "@nestjs/schedule";
         host: config.getOrThrow<string>('mongodb.host'),
         database: config.getOrThrow<string>('mongodb.database'),
         port: config.getOrThrow<number>('mongodb.port'),
-        entities: [OpencastEvent],
+        entities: [Conference],
         synchronize: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
+        dropSchema: true
       }),
       inject: [ConfigService],
     }),

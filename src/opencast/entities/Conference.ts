@@ -1,7 +1,7 @@
 import { Column, Entity, ObjectID, ObjectIdColumn } from "typeorm";
 
 @Entity()
-export class OpencastEvent {
+export class Conference {
   @ObjectIdColumn()
   id: ObjectID;
 
@@ -9,7 +9,7 @@ export class OpencastEvent {
   title: string;
 
   @Column()
-  roomId: string;
+  roomSid: string;
 
   @Column()
   courseName: string;

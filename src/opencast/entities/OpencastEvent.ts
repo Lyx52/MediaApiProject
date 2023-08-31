@@ -1,8 +1,7 @@
 import { Column, Entity, ObjectID, ObjectIdColumn } from 'typeorm';
 import { CaptureAgentState } from "../dto/enums/CaptureAgentState";
 import { OpencastRecordingState } from "../dto/enums/OpencastRecordingState";
-import { IngestJobDto } from "../dto/IngestJobDto";
-import { OpencastIngestType } from "../dto/enums/OpencastIngestType";
+import {RecorderType} from "../dto/enums/RecorderType";
 
 @Entity()
 export class OpencastEvent {
@@ -11,10 +10,8 @@ export class OpencastEvent {
 
   @Column()
   title: string;
-
   @Column()
   subject: string;
-
   @Column()
   location: string;
   @Column()
@@ -24,18 +21,13 @@ export class OpencastEvent {
   @Column()
   roomSid: string;
   @Column()
-  recorderId: string;
-  @Column()
   start: Date;
   @Column()
   end: Date;
   @Column()
-  agentState: CaptureAgentState;
-  @Column()
   recordingState: OpencastRecordingState;
   @Column()
-  type: OpencastIngestType;
-
-  @Column('json', { nullable: false })
-  jobs: IngestJobDto[];
+  recorder: RecorderType;
+  @Column()
+  agentState: CaptureAgentState;
 }
