@@ -4,22 +4,22 @@ import {Cron, CronExpression, SchedulerRegistry} from "@nestjs/schedule";
 import {ConfigService} from "@nestjs/config";
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import {OpencastService} from "./opencast.service";
+import {OpencastService} from "../../opencast/services/opencast.service";
 import {INGEST_RECORDINGS, MP4_EXTENSION} from "../../app.constants";
-import {Recording} from "../dto/Recording";
+import {Recording} from "../../opencast/dto/Recording";
 import {InjectRepository} from "@nestjs/typeorm";
 import {MongoRepository} from "typeorm";
 import {Conference} from "../entities/Conference";
-import {OpencastUploadJobDto} from "../dto/OpencastUploadJobDto";
+import {OpencastUploadJobDto} from "../../opencast/dto/OpencastUploadJobDto";
 import {InjectQueue} from "@nestjs/bull";
 import {Queue} from "bull";
-import {RecorderType} from "../dto/enums/RecorderType";
+import {RecorderType} from "../../opencast/dto/enums/RecorderType";
 import * as util from "util";
-import {FsUtils} from "../../common/utils/fs.utils";
+import {FsUtils} from "../utils/fs.utils";
 
 @Injectable()
-export class OpencastTaskService implements OnModuleInit {
-  private readonly logger = new Logger(OpencastTaskService.name);
+export class IngesterTaskService implements OnModuleInit {
+  private readonly logger = new Logger(IngesterTaskService.name);
   private readonly PNMController: PlugNmeet;
   private readonly pnmRecordingLocation: string;
   private readonly epiphanRecordingLocation: string;

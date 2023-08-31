@@ -46,7 +46,8 @@ export class OpencastVideoIngestConsumer {
       let event = <OpencastEvent>{
         roomSid: job.data.conference?.roomSid,
         start: new Date(job.data.started),
-        end: new Date(job.data.ended)
+        end: new Date(job.data.ended),
+        recorder: job.data.recorder
       }
       event.title = `${job.data.conference?.title || job.data.recorder} Recording (${event.start.toLocaleDateString('lv-LV')})`;
       const series: any = await this.opencastService.createOrGetSeriesByTitle(job.data.conference?.courseName || getSeriesName(job.data.recorder), job.data.recorder);
@@ -57,7 +58,7 @@ export class OpencastVideoIngestConsumer {
       mediaPackage = await this.opencastService.addDublinCore(event, <string>mediaPackage);
       event = await this.opencastService.createRecordingEvent(event, <string>mediaPackage);
       await this.opencastService.setAccessListTemplate(event, 'public');
-      await this.opencastService.setWorkflow(event, 'lbtu-wf-upload');
+      await this.opencastService.setWorkflow(event, 'lbtu-wf-schedule-and-upload');
       await this.opencastService.setCaptureAgentState(event.recorder, CaptureAgentState.IDLE);
       await this.opencastService.setRecordingEventState(event.eventId, OpencastRecordingState.UPLOADING);
       let videoPart = 0;

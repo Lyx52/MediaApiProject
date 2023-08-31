@@ -1,5 +1,5 @@
 import {IsNotEmpty, IsString} from "class-validator";
-import {Conference} from "../entities/Conference";
+import {Conference} from "../../common/entities/Conference";
 import {Recording} from "./Recording";
 import {RecorderType} from "./enums/RecorderType";
 

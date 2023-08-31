@@ -5,7 +5,7 @@ import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/OpencastEvent";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
-import {Conference} from "./opencast/entities/Conference";
+import {Conference} from "./common/entities/Conference";
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({

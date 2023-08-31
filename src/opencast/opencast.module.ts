@@ -1,17 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ClientsModule, Transport } from "@nestjs/microservices";
-import { OPENCAST_SERVICE } from "../app.constants";
-import { OpencastController } from "./opencast.controller";
 import { BullModule } from "@nestjs/bull";
 import { HttpModule } from "@nestjs/axios";
 import { OpencastService } from "./services/opencast.service";
 import { ConfigModule } from "@nestjs/config";
 import config from "../common/utils/config.yaml";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { OpencastEvent } from "./entities/OpencastEvent";
 import { OpencastVideoIngestConsumer } from "./processors/opencast.ingest.processor";
-import { OpencastTaskService } from "./services/opencast.task.service";
-import {Conference} from "./entities/Conference";
+import { IngesterTaskService } from "../common/services/ingester.task.service";
+import {Conference} from "../common/entities/Conference";
 @Module({
   imports: [
     BullModule.registerQueue({
@@ -28,7 +24,7 @@ import {Conference} from "./entities/Conference";
     }),
     ConfigModule.forRoot({ load: [config] }),
   ],
-  providers: [OpencastVideoIngestConsumer, OpencastService, OpencastTaskService],
-  controllers: [OpencastController],
+  providers: [OpencastVideoIngestConsumer, OpencastService, IngesterTaskService],
+  controllers: [],
 })
 export class OpencastModule {}

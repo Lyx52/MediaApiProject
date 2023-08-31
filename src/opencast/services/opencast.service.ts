@@ -107,7 +107,7 @@ export class OpencastService implements OnModuleInit {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const params = new URLSearchParams();
     params.set('eventId', eventId);
-    params.set('type', 'lbtu-wf-upload');
+    params.set('type', 'lbtu-wf-schedule-and-upload');
     params.set('metadata', eventId);
     return firstValueFrom(this.httpService.post(`${this.host}/api/events/${eventId}/metadata`, {}, {
       headers: headers,
@@ -122,7 +122,7 @@ export class OpencastService implements OnModuleInit {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const params = new URLSearchParams();
     params.set('mediaPackage', mediaPackage);
-    params.set('workflowDefinitionId', 'lbtu-wf-upload');
+    params.set('workflowDefinitionId', 'lbtu-wf-schedule-and-upload');
     params.set('workflowInstanceId', eventId);
     return firstValueFrom(this.httpService.post(`${this.host}/ingest/ingest`, {}, {
       headers: headers,

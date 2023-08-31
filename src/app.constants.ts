@@ -1,19 +1,6 @@
-// Microservice client names
-export const OPENCAST_SERVICE = 'OPENCAST_SERVICE';
-
-// Microservice command patterns
-export const START_OPENCAST_EVENT = { cmd: "createOpencastEvent" }
-export const STOP_OPENCAST_EVENT = { cmd: "startOpencastIngest" }
-export const ADD_OPENCAST_INGEST_JOB = { cmd: "addOpencastIngestJob" }
-export const PLUGNMEET_ROOM_ENDED = { cmd: 'pnmRoomEnded' }
-export const GET_CONFERENCE_SESSION = { cmd: 'getConferenceSession' }
-export const START_INGESTING_VIDEOS = { cmd: 'startIngestingVideos' }
-
-// Job patterns
+// Job paterns
 export const INGEST_RECORDINGS = 'INGEST_RECORDINGS';
 
 // Other constants
 export const YAML_CONFIG_LOCATION = '../../../config.yaml';
 export const MP4_EXTENSION = '.mp4'
-export const PLUGNMEET_RECORDER = 'PlugNMeet recording';
-export const EPIPHAN_RECORDER = 'Epiphan recording';
