@@ -5,7 +5,8 @@ import { BullModule } from "@nestjs/bull";
 import { OpencastEvent } from "./opencast/entities/OpencastEvent";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
-import {Conference} from "./common/entities/Conference";
+import {Conference} from "./conference/entities/Conference";
+import {ConferenceModule} from "./conference/conference.module";
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -36,7 +37,7 @@ import {Conference} from "./common/entities/Conference";
       }),
       inject: [ConfigService],
     }),
-    OpencastModule
+    OpencastModule, ConferenceModule
   ],
 })
 export class AppModule {}

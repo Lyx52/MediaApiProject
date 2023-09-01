@@ -9,13 +9,11 @@ import {INGEST_RECORDINGS, MP4_EXTENSION} from "../../app.constants";
 import {Recording} from "../../opencast/dto/Recording";
 import {InjectRepository} from "@nestjs/typeorm";
 import {MongoRepository} from "typeorm";
-import {Conference} from "../entities/Conference";
+import {Conference} from "../../conference/entities/Conference";
 import {OpencastUploadJobDto} from "../../opencast/dto/OpencastUploadJobDto";
 import {InjectQueue} from "@nestjs/bull";
 import {Queue} from "bull";
 import {RecorderType} from "../../opencast/dto/enums/RecorderType";
-import * as util from "util";
-import {FsUtils} from "../utils/fs.utils";
 
 @Injectable()
 export class IngesterTaskService implements OnModuleInit {
@@ -50,8 +48,8 @@ export class IngesterTaskService implements OnModuleInit {
     for (const roomSid of rooms) {
       if (roomSid.endsWith('_processing')) continue;
       try {
-        const response = await this.PNMController.isRoomActive({room_id: roomSid});
-        if (response.msg !== 'room is not active') continue;
+        const response = await this.PNMController.getActiveRoomsInfo();
+        if (!response.rooms || response.rooms.some(rm => rm.room_info.is_running && rm.room_info.sid === roomSid)) continue;
         const videoFiles = await fs.readdir(path.resolve(this.pnmRecordingLocation, roomSid));
         const videos = videoFiles
             .filter(vf => vf.endsWith(MP4_EXTENSION))
@@ -72,7 +70,7 @@ export class IngesterTaskService implements OnModuleInit {
           }
         });
       } catch (e) {
-        this.logger.error("Could not check if room is active!", e);
+        this.logger.error("Error while trying to push a new job!\n", e);
       }
     }
 

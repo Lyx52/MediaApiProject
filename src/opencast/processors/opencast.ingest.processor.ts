@@ -1,5 +1,5 @@
 import {Process, Processor} from "@nestjs/bull";
-import {Logger} from "@nestjs/common";
+import {Logger, OnModuleInit} from "@nestjs/common";
 import {OpencastService} from "../services/opencast.service";
 import {OpencastEvent} from "../entities/OpencastEvent";
 import {INGEST_RECORDINGS} from "../../app.constants";
@@ -14,16 +14,26 @@ import {FsUtils} from "../../common/utils/fs.utils";
 import * as fs from "fs/promises";
 
 @Processor('video')
-export class OpencastVideoIngestConsumer {
+export class OpencastVideoIngestConsumer implements OnModuleInit {
   private readonly logger: Logger = new Logger(OpencastVideoIngestConsumer.name);
-  private readonly pnmRecordingLocation: string;
-  private readonly epiphanRecordingLocation: string;
+  private readonly pnmArchiveLocation: string;
+  private readonly epiphanArchiveLocation: string;
   constructor(
     private readonly opencastService: OpencastService,
     private readonly config: ConfigService,
   ) {
-    this.pnmRecordingLocation = path.resolve(this.config.getOrThrow<string>('appconfig.pnm_recording_location'));
-    this.epiphanRecordingLocation = path.resolve(this.config.getOrThrow<string>('appconfig.epiphan_recording_location'));
+    const archiveLocation = path.resolve(this.config.getOrThrow<string>('appconfig.archive_location'));
+    this.pnmArchiveLocation = path.resolve(archiveLocation, 'plugnmeet');
+    this.epiphanArchiveLocation = path.resolve(archiveLocation, 'epiphan');
+  }
+
+  async onModuleInit() {
+    if (!await FsUtils.exists(this.pnmArchiveLocation)) {
+      await fs.mkdir(this.pnmArchiveLocation);
+    }
+    if (!await FsUtils.exists(this.epiphanArchiveLocation)) {
+      await fs.mkdir(this.epiphanArchiveLocation);
+    }
   }
 
   @Process(INGEST_RECORDINGS)
@@ -38,6 +48,7 @@ export class OpencastVideoIngestConsumer {
 
     try {
       let basePath = job.data.basePath;
+      const recorder = `${job.data.recorder}_${Date.now()}`;
       if (job.data.recorder === RecorderType.PLUGNMEET_RECORDING) {
         const fpath = path.parse(job.data.basePath);
         await fs.rename(job.data.basePath, path.resolve(fpath.dir, `${fpath.name}_processing`));
@@ -56,11 +67,12 @@ export class OpencastVideoIngestConsumer {
           await this.opencastService.createMediaPackageWithId(job.data.conference.roomSid) :
           await this.opencastService.createMediaPackage();
       mediaPackage = await this.opencastService.addDublinCore(event, <string>mediaPackage);
-      event = await this.opencastService.createRecordingEvent(event, <string>mediaPackage);
+      event = await this.opencastService.createRecordingEvent(event, <string>mediaPackage, recorder);
       await this.opencastService.setAccessListTemplate(event, 'public');
       await this.opencastService.setWorkflow(event, 'lbtu-wf-schedule-and-upload');
-      await this.opencastService.setCaptureAgentState(event.recorder, CaptureAgentState.IDLE);
+      await this.opencastService.setCaptureAgentState(recorder, CaptureAgentState.IDLE);
       await this.opencastService.setRecordingEventState(event.eventId, OpencastRecordingState.UPLOADING);
+
       let videoPart = 0;
       let processedFiles = 0;
       mediaPackage = <string>await this.opencastService.getMediaPackageByEventId(event.eventId);
@@ -80,11 +92,20 @@ export class OpencastVideoIngestConsumer {
         this.logger.warn("No media files were added to event, skipping ingestion");
         await this.opencastService.setRecordingEventState(event.eventId, OpencastRecordingState.UPLOAD_ERROR);
       }
+      switch (job.data.recorder) {
+        case RecorderType.EPIPHAN_RECORDING:
+          await fs.rename(basePath, path.resolve(this.epiphanArchiveLocation, path.parse(basePath).name.replace('_processing', '')));
+        break;
+        case RecorderType.PLUGNMEET_RECORDING:
+          await fs.rename(basePath, path.resolve(this.pnmArchiveLocation, path.parse(basePath).name.replace('_processing', '')));
+        break;
+      }
+      await this.opencastService.deleteRecorder(recorder);
       await job.moveToCompleted();
     } catch (e)
     {
       this.logger.error(`Caught exception while processing a job ${e}`);
-      await job.retry();
+      await job.moveToFailed({ message: `Caught exception while processing a job ${e}` });
     }
   }
 }

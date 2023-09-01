@@ -4,9 +4,13 @@ appconfig:
   port: 9999
   pnm_recording_location: './recordings'
   epiphan_recording_location: './recordings_epiphan'
+  archive_location: './archive'
   key: MEDIA_API_KEY
   secret: MEDIA_API_SECRET
   host: MEDIA_API_HOST
+  locations:
+    - "LBTU_110_ROOM:LBTU 110 telpa"
+    - "LBTU_112_ROOM:LBTU 112 telpa!"
 plugnmeet:
   host: PLUG_N_MEET_SERVER_DOMAIN
   key: PLUG_N_MEET_API_KEY

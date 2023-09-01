@@ -361,7 +361,7 @@ export class OpencastService implements OnModuleInit {
     return <string>newMediaPackage;
   }
   async setCaptureAgentState(
-    recorder: RecorderType,
+    recorder: string,
     state = CaptureAgentState.IDLE,
   ) {
     const params = new URLSearchParams();
@@ -391,11 +391,11 @@ export class OpencastService implements OnModuleInit {
     ));
   };
 
-  async createRecordingEvent(event: OpencastEvent, mediaPackage: string) {
+  async createRecordingEvent(event: OpencastEvent, mediaPackage: string, recorder: string) {
     const params = new URLSearchParams();
     params.set('start', event.start.getTime().toString());
     params.set('end', event.end.getTime().toString());
-    params.set('agent', event.recorder);
+    params.set('agent', recorder);
     params.set('mediaPackage', mediaPackage);
     params.set('users', 'admin');
     params.set('source', event.title);
@@ -409,7 +409,7 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    const createdEvent: any = await this.getLastRecording(event.recorder);
+    const createdEvent: any = await this.getLastRecording(recorder);
     event.eventId = createdEvent.id;
     return event;
   }
@@ -426,7 +426,7 @@ export class OpencastService implements OnModuleInit {
       retryPolicy(),
       handleAxiosExceptions(),
     ));
-    const createdEvent: any = await this.getLastRecording(event.recorder);
+    const createdEvent: any = await this.getLastRecording(`${event.recorder}_${event.seriesId}`);
     event.eventId = createdEvent.id;
     return event;
   }
@@ -556,39 +556,7 @@ export class OpencastService implements OnModuleInit {
       handleAxiosExceptions(),
     ));
   };
-  private async updateEventScheduling(event: OpencastEvent) {
-    const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
-    const data = new FormData();
-    const mediaPackage = <string>await this.getMediaPackageByEventId(event.eventId);
-    data.set('start', event.start.getTime().toString());
-    data.set('end', event.end.getTime().toString());
-    data.set('agent', event.recorder);
-    data.set('mediaPackage', mediaPackage);
-    data.set('users', 'admin');
-    data.set('source', event.title);
-    await firstValueFrom(this.httpService.put(`${this.host}/recordings/${event.eventId}`, data, {
-      headers: headers
-    }).pipe(
-      map((response) => response.data),
-      retryPolicy(),
-      handleAxiosExceptions(),
-    ));
-  };
-  private async stopRecordingEventByEntity(event: OpencastEvent): Promise<boolean> {
-    try {
-      /**
-       * Set event state, indicating that ingesting queue can start ingesting videos.
-       */
-      await this. setRecordingEventState(event.eventId, OpencastRecordingState.CAPTURE_FINISHED);
-      await this.setCaptureAgentState(event.recorder, CaptureAgentState.IDLE);
-      event.end = new Date();
-      await this.updateEventScheduling(event);
-      return true;
-    } catch (e) {
-      this.logger.error(`Caught exception while stopping event: ${e}!`);
-      return false;
-    }
-  }
+
   public async createOrGetSeriesByTitle(seriesTitle: string, recorder: RecorderType) {
     const headers = this.makeAuthHeader('application/x-www-form-urlencoded');
     const series: any = await firstValueFrom(this.httpService.get(`${this.host}/api/series/series.json?seriesTitle=${seriesTitle}`, {

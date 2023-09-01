@@ -7,7 +7,7 @@ import config from "../common/utils/config.yaml";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { OpencastVideoIngestConsumer } from "./processors/opencast.ingest.processor";
 import { IngesterTaskService } from "../common/services/ingester.task.service";
-import {Conference} from "../common/entities/Conference";
+import {Conference} from "../conference/entities/Conference";
 @Module({
   imports: [
     BullModule.registerQueue({
