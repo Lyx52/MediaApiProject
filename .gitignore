@@ -4,8 +4,12 @@
 node_modules
 
 # Recordings
-recording_files/
-recording_files
+recordings/
+recordings_epiphan/
+recordings
+recordings_epiphan
+workdir
+workdir/
 # IDE
 /.idea
 /.awcache

@@ -11,19 +11,21 @@ import {OpencastRecordingState} from "../dto/enums/OpencastRecordingState";
 import * as path from 'path'
 import {ConfigService} from "@nestjs/config";
 import {FsUtils} from "../../common/utils/fs.utils";
+import * as fse from "fs-extra";
 import * as fs from "fs/promises";
-import * as os from "os";
 
 @Processor('video')
 export class OpencastVideoIngestConsumer implements OnModuleInit {
   private readonly logger: Logger = new Logger(OpencastVideoIngestConsumer.name);
   private readonly pnmArchiveLocation: string;
   private readonly epiphanArchiveLocation: string;
+  private readonly workdirLocation: string;
   constructor(
     private readonly opencastService: OpencastService,
     private readonly config: ConfigService,
   ) {
     const archiveLocation = path.resolve(this.config.getOrThrow<string>('appconfig.archive_location'));
+    this.workdirLocation = path.resolve(this.config.getOrThrow<string>('appconfig.workdir_location'));
     this.pnmArchiveLocation = path.resolve(archiveLocation, 'plugnmeet');
     this.epiphanArchiveLocation = path.resolve(archiveLocation, 'epiphan');
   }
@@ -35,8 +37,18 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
     if (!await FsUtils.exists(this.epiphanArchiveLocation)) {
       await fs.mkdir(this.epiphanArchiveLocation);
     }
+    if (!await FsUtils.exists(this.workdirLocation)) {
+      await fs.mkdir(this.workdirLocation);
+    }
   }
-
+  makeRandomId(length) {
+    let output = '';
+    const characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < length; i++) {
+      output += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return output;
+  }
   @Process(INGEST_RECORDINGS)
   async ingestMediaPackage(job: Job<OpencastUploadJobDto>) {
     this.logger.debug("Started INGEST_MEDIAPACKAGE_JOB");
@@ -69,7 +81,8 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
       await this.opencastService.setRecordingEventState(event.eventId, OpencastRecordingState.UPLOADING);
 
       let basePath = job.data.basePath;
-      const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), `${job.data.conference?.location || getRecorderId(job.data.recorder)}-`));
+      const tempDirectory = path.resolve(this.workdirLocation, `${job.data.conference?.location || getRecorderId(job.data.recorder)}-${this.makeRandomId(6)}`);
+      await fs.mkdir(tempDirectory);
 
       /**
        *  For plugnmeet we move the whole folder but for epiphan we move individual recordings
@@ -77,10 +90,10 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
       if (job.data.recorder === RecorderType.PLUGNMEET_RECORDING) {
         const recPath = path.parse(job.data.basePath);
         basePath = path.resolve(tempDirectory, recPath.name);
-        await fs.rename(job.data.basePath, basePath);
+        await fse.move(job.data.basePath, basePath);
       } else if (job.data.recorder === RecorderType.EPIPHAN_RECORDING) {
         for (const recording of job.data.recordings) {
-          await fs.rename(path.resolve(basePath, recording.fileName), path.resolve(tempDirectory, recording.fileName));
+          await fse.move(path.resolve(basePath, recording.fileName), path.resolve(tempDirectory, recording.fileName));
         }
         basePath = tempDirectory;
       }
@@ -118,6 +131,7 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
         break;
       }
       await this.opencastService.deleteRecorder(recorder);
+      await fs.rmdir(basePath);
       await job.moveToCompleted();
     } catch (e)
     {
