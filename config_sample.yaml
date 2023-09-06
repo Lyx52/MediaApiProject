@@ -9,8 +9,10 @@ appconfig:
   secret: MEDIA_API_SECRET
   host: MEDIA_API_HOST
   locations:
-    - "LBTU_110_ROOM:LBTU 110 telpa"
-    - "LBTU_112_ROOM:LBTU 112 telpa!"
+    - name: LBTU 110 telpa
+      id: Tests
+    - name: LBTU 112 telpa!
+      id: LBTU_112_ROOM
 plugnmeet:
   host: PLUG_N_MEET_SERVER_DOMAIN
   key: PLUG_N_MEET_API_KEY

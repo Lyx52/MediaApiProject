@@ -18,8 +18,7 @@ import {ConferenceModule} from "./conference/conference.module";
         port: config.getOrThrow<number>('mongodb.port'),
         entities: [Conference],
         synchronize: true,
-        useUnifiedTopology: true,
-        dropSchema: true
+        useUnifiedTopology: true
       }),
       inject: [ConfigService],
     }),

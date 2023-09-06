@@ -23,4 +23,10 @@ export class Conference {
 
   @Column()
   metadata: string;
+
+  @Column()
+  started: Date;
+
+  @Column()
+  ended: Date;
 }

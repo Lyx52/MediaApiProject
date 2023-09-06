@@ -46,20 +46,24 @@ export class ConferenceService {
         if (response.status) {
             const entity = this.conferenceRepository.create();
             entity.roomId = payload.roomId;
-            entity.roomSid = response.roomInfo.sid;
             entity.metadata = response.roomInfo?.metadata || undefined;
+            entity.location = payload.location;
+            entity.courseName = payload.opencastSeriesId;
+            entity.title = payload.metadata.room_title;
+            entity.started = new Date();
             if (!entity.metadata) {
                 const roomInfo = await this.PNMController.getActiveRoomInfo({room_id: payload.roomId});
                 entity.metadata = roomInfo.room?.room_info?.metadata;
+                entity.roomSid = roomInfo.room?.room_info?.sid;
             }
 
             await this.conferenceRepository.insert(entity);
-            this.logger.log(`PlugNMeet room ${response.roomInfo.sid} created!`);
+            this.logger.log(`PlugNMeet room ${entity.roomSid} created!`);
         }
 
         return response;
     }
-    getLocations() {
-
+    getLocations() : LocationConfig[] {
+        return this.currentLocations
     }
 }

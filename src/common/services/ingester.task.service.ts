@@ -44,7 +44,8 @@ export class IngesterTaskService implements OnModuleInit {
   @Cron(CronExpression.EVERY_30_SECONDS)
   async uploadPlugNMeetRecordings() {
     const uploadJobs = []
-    const rooms = await fs.readdir(this.pnmRecordingLocation);
+    const rooms: string[] = await fs.readdir(this.pnmRecordingLocation);
+    const devices: string[] = await fs.readdir(this.epiphanRecordingLocation);
     for (const roomSid of rooms) {
       if (roomSid.endsWith('_processing')) continue;
       try {
@@ -73,10 +74,31 @@ export class IngesterTaskService implements OnModuleInit {
         this.logger.error("Error while trying to push a new job!\n", e);
       }
     }
+    for (const device of devices) {
+      const deviceRecordingLocation = path.resolve(this.epiphanRecordingLocation, device)
+      const videoFiles = await fs.readdir(deviceRecordingLocation);
+      for (const video of videoFiles) {
+        const filePath = path.resolve(deviceRecordingLocation, video);
+        const fileInfo = await fs.stat(filePath);
+        const parts = path.parse(filePath).name.split('_');
+        const videoDateStr = `${parts[1]}-${fileInfo.atime.getFullYear()} ${parts[2].replace(/-/g, ":")}`;
+        if (isNaN(Date.parse(videoDateStr))) continue;
+        const videoDate = new Date(videoDateStr);
 
-    /**
-     *  TODO: Implement epiphan upload jobs
-     */
+        const conference = await this.conferenceRepository.findOne({ where: { location: device, started: { $lt: videoDate }, ended: { $gt: new Date(videoDate.getTime() + 900) } } });
+        uploadJobs.push({
+          name: INGEST_RECORDINGS,
+          data: <OpencastUploadJobDto> {
+            recorder: RecorderType.EPIPHAN_RECORDING,
+            basePath: deviceRecordingLocation,
+            recordings: [ <Recording>{ fileName: video, started: videoDate.getTime() } ],
+            conference: conference,
+            started: videoDate.getTime(),
+            ended: Date.now()
+          }
+        });
+      }
+    }
     await this.ingestQueue.addBulk(uploadJobs);
   }
 }

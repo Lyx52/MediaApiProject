@@ -5,13 +5,14 @@ import {OpencastEvent} from "../entities/OpencastEvent";
 import {INGEST_RECORDINGS} from "../../app.constants";
 import {OpencastUploadJobDto} from "../dto/OpencastUploadJobDto";
 import {Job} from "bull";
-import {getSeriesName, RecorderType} from "../dto/enums/RecorderType";
+import {getRecorderId, getSeriesName, RecorderType} from "../dto/enums/RecorderType";
 import {CaptureAgentState} from "../dto/enums/CaptureAgentState";
 import {OpencastRecordingState} from "../dto/enums/OpencastRecordingState";
 import * as path from 'path'
 import {ConfigService} from "@nestjs/config";
 import {FsUtils} from "../../common/utils/fs.utils";
 import * as fs from "fs/promises";
+import * as os from "os";
 
 @Processor('video')
 export class OpencastVideoIngestConsumer implements OnModuleInit {
@@ -47,25 +48,19 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
     }
 
     try {
-      let basePath = job.data.basePath;
       const recorder = `${job.data.recorder}_${Date.now()}`;
-      if (job.data.recorder === RecorderType.PLUGNMEET_RECORDING) {
-        const fpath = path.parse(job.data.basePath);
-        await fs.rename(job.data.basePath, path.resolve(fpath.dir, `${fpath.name}_processing`));
-        basePath = path.resolve(fpath.dir, `${fpath.name}_processing`);
-      }
       let event = <OpencastEvent>{
         roomSid: job.data.conference?.roomSid,
         start: new Date(job.data.started),
         end: new Date(job.data.ended),
-        recorder: job.data.recorder
-      }
+        recorder: job.data.recorder,
+        location: job.data.conference?.location
+      };
+
       event.title = `${job.data.conference?.title || job.data.recorder} Recording (${event.start.toLocaleDateString('lv-LV')})`;
       const series: any = await this.opencastService.createOrGetSeriesByTitle(job.data.conference?.courseName || getSeriesName(job.data.recorder), job.data.recorder);
       event.seriesId = series.identifier;
-      let mediaPackage: string = job.data.conference?.roomSid ?
-          await this.opencastService.createMediaPackageWithId(job.data.conference.roomSid) :
-          await this.opencastService.createMediaPackage();
+      let mediaPackage: string = await this.opencastService.createMediaPackage();
       mediaPackage = await this.opencastService.addDublinCore(event, <string>mediaPackage);
       event = await this.opencastService.createRecordingEvent(event, <string>mediaPackage, recorder);
       await this.opencastService.setAccessListTemplate(event, 'public');
@@ -73,6 +68,22 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
       await this.opencastService.setCaptureAgentState(recorder, CaptureAgentState.IDLE);
       await this.opencastService.setRecordingEventState(event.eventId, OpencastRecordingState.UPLOADING);
 
+      let basePath = job.data.basePath;
+      const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), `${job.data.conference?.location || getRecorderId(job.data.recorder)}-`));
+
+      /**
+       *  For plugnmeet we move the whole folder but for epiphan we move individual recordings
+       */
+      if (job.data.recorder === RecorderType.PLUGNMEET_RECORDING) {
+        const recPath = path.parse(job.data.basePath);
+        basePath = path.resolve(tempDirectory, recPath.name);
+        await fs.rename(job.data.basePath, basePath);
+      } else if (job.data.recorder === RecorderType.EPIPHAN_RECORDING) {
+        for (const recording of job.data.recordings) {
+          await fs.rename(path.resolve(basePath, recording.fileName), path.resolve(tempDirectory, recording.fileName));
+        }
+        basePath = tempDirectory;
+      }
       let videoPart = 0;
       let processedFiles = 0;
       mediaPackage = <string>await this.opencastService.getMediaPackageByEventId(event.eventId);
@@ -94,10 +105,16 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
       }
       switch (job.data.recorder) {
         case RecorderType.EPIPHAN_RECORDING:
-          await fs.rename(basePath, path.resolve(this.epiphanArchiveLocation, path.parse(basePath).name.replace('_processing', '')));
-        break;
+          const recordingArchiveLocation = path.resolve(this.epiphanArchiveLocation, path.parse(job.data.basePath).name);
+          if (!await FsUtils.exists(recordingArchiveLocation)) {
+            await fs.mkdir(recordingArchiveLocation);
+          }
+          for (const recording of job.data.recordings) {
+            await fs.rename(path.resolve(basePath, recording.fileName), path.resolve(recordingArchiveLocation, recording.fileName));
+          }
+          break;
         case RecorderType.PLUGNMEET_RECORDING:
-          await fs.rename(basePath, path.resolve(this.pnmArchiveLocation, path.parse(basePath).name.replace('_processing', '')));
+          await fs.rename(basePath, path.resolve(this.pnmArchiveLocation, path.parse(basePath).name));
         break;
       }
       await this.opencastService.deleteRecorder(recorder);
