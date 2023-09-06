@@ -3,22 +3,17 @@ services:
   mongo:
     image: mongo:latest
     restart: always
-    networks:
-      - app-intranet
+    ports:
+      - "27017:27017"
   webapi:
     container_name: 'lbtu-media-api'
+    #tty: true
     restart: always
     build: .
     volumes:
-      - ./recordings:/app/recording_files
+      - ./recordings:/app/recordings
+      - ./recordings_epiphan:/app/recordings_epiphan
+      - ./archive:/app/archive
+      - ./workdir:/app/workdir
       - ./config.yaml:/app/config.yaml:ro
-    networks:
-      - app-intranet
-      - lbtu-conference-network
-    ports:
-      - "8899:8899"
-networks:
-  app-intranet:
-    driver: bridge
-  lbtu-conference-network:
-    external: true
+    network_mode: "host"
