@@ -123,11 +123,11 @@ export class OpencastVideoIngestConsumer implements OnModuleInit {
             await fs.mkdir(recordingArchiveLocation);
           }
           for (const recording of job.data.recordings) {
-            await fs.rename(path.resolve(basePath, recording.fileName), path.resolve(recordingArchiveLocation, recording.fileName));
+            await fse.move(path.resolve(basePath, recording.fileName), path.resolve(recordingArchiveLocation, recording.fileName));
           }
           break;
         case RecorderType.PLUGNMEET_RECORDING:
-          await fs.rename(basePath, path.resolve(this.pnmArchiveLocation, path.parse(basePath).name));
+          await fse.move(basePath, path.resolve(this.pnmArchiveLocation, path.parse(basePath).name));
         break;
       }
       await this.opencastService.deleteRecorder(recorder);
